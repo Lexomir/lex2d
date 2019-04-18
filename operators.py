@@ -38,6 +38,10 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
         return True
 
     def execute(self, context):
+        if not bpy.data.filepath:
+            self.report({'ERROR'}, "Save the project first. This operation needs a project folder.")
+            return {"CANCELLED"}
+
         active_obj = context.object 
 
         # find open file browser window
