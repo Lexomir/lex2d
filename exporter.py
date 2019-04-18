@@ -68,6 +68,15 @@ def export_scene_states(scene, output_filepath):
             for node in nodegroup.nodes:
                 #serialize_state += node.serialized_hierarchy
                 
+                try:
+                    from . import _lex_suite
+                    lex_smithy = _lex_suite.lex_game.smithy
+                    if not lex_smithy.state_script_exists(node.name):
+                        lex_smithy.create_state_script(node.name)
+                except Exception as err:
+                    print(err)
+                    raise
+                    
                 serialized_scene += "\t[\"{}\"] = {{\n".format(node.name)
                 serialized_scene += "\t\tobjects = {\n"
 

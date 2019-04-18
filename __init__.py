@@ -11,6 +11,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+# -----------------------------------------
+# depends on:
+#   lex_suite.lexgame
+#   lex_suite.lex_statemachine
+
 bl_info = {
     "name" : "Lex2D",
     "author" : "lexomir",
@@ -35,7 +40,10 @@ def unregister():
     auto_load.unregister()
 
 
-def __lex_suite_registered__(lex_suite):
+_lex_suite = None
+def __lex_suite_registered__(lex_suite_module):
     from .utils import _lex_suite_callbacks
+    global _lex_suite
+    _lex_suite = lex_suite_module
     for cb in _lex_suite_callbacks:
-        cb(lex_suite)
+        cb(lex_suite_module)
