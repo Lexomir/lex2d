@@ -51,8 +51,8 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
             active_browser = file_browsers[0]
             
             # get selected file
-            abs_filepath = active_browser.params.directory + active_browser.params.filename
-            abs_img_dir = bpy.path.abspath(get_image_dir())
+            abs_filepath = os.path.normpath(active_browser.params.directory + active_browser.params.filename)
+            abs_img_dir = os.path.normpath(bpy.path.abspath(get_image_dir()))
             in_img_dir = os.path.commonpath([abs_filepath, abs_img_dir]) == abs_img_dir
 
             if in_img_dir:
