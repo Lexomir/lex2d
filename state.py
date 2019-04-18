@@ -8,7 +8,7 @@ import os
 
 
 def _obj_component_updated(obj, smithy_component_instance):
-    if smithy_component_instance.filepath == "Renderer2D":
+    if smithy_component_instance.filepath == "Render2D":
         rel_spritesheet_filepath = smithy_component_instance.get_input('asset')
         if rel_spritesheet_filepath:
             spritesheet_filepath = get_image_dir() + rel_spritesheet_filepath

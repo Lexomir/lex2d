@@ -16,7 +16,7 @@ def serialize_obj_state(obj_state, line_prefix):
         return string_val
 
     def convert_to_screen_position(blender_pos):
-        return [(1920 * .5) + (blender_pos[0] * 120), (1080 * .5) - (blender_pos[1] * 120), blender_pos[2]]
+        return [(blender_pos[0] * 120), -(blender_pos[1] * 120), blender_pos[2]]
 
     def convert_to_screen_size(blender_size):
         return [blender_size[0] * 120, blender_size[1] * 120, blender_size[2]]
@@ -40,12 +40,17 @@ def serialize_obj_state(obj_state, line_prefix):
 
     # other components
     for sc in obj_state.smithy_components_serialized:
-        serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, sc.filepath)
+        if sc.filepath:
+            serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, sc.filepath)
 
-        sinputs = sc.data.split("\n")
-        for si in sinputs:
-            input_name, input_datatype, input_str_value = si.split(",", 2)
-            serialized_state += "{}\t\t\t[\"{}\"]={},\n".format(line_prefix, input_name, convert_to_lua_value(input_datatype, input_str_value))
+            sinputs = sc.data.split("\n")
+            for si in sinputs:
+                try:
+                    input_name, input_datatype, input_str_value = si.split(",", 2)
+                    serialized_state += "{}\t\t\t[\"{}\"]={},\n".format(line_prefix, input_name, convert_to_lua_value(input_datatype, input_str_value))
+                except:
+                    print("ERROR: Invalid component input in a state for object '{}', component '{}', input ['{}']".format(obj_state.name, sc.filepath, si))
+                    raise
 
         serialized_state += "{}\t\t}},\n".format(line_prefix) # end component 
 
@@ -83,5 +88,10 @@ class export_scene_states_operator(bpy.types.Operator):
     def execute(self, context):
         blend_name = bpy.path.display_name(bpy.data.filepath)
         output_filepath = "{}/{}.lua".format(get_asset_dir(), blend_name)
-        export_scene_states(context.scene, output_filepath)
+        try:
+            for scene in bpy.data.scenes:
+                scene.lexsm.get_nodegroup().save_current_state()
+            export_scene_states(context.scene, output_filepath)
+        except:
+            self.report({"ERROR"}, "Error encountered while exporting scene states. See Console.")
         return {'FINISHED'}

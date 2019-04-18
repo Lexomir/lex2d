@@ -1,5 +1,6 @@
 import bpy
 import os
+import shutil
 
 from .utils import *
 
@@ -9,7 +10,8 @@ def find_spritesheet_data_for_image(image_filepath):
     # find spritesheet file
     abs_image_filepath = bpy.path.abspath(get_image_dir() + image_filepath)
     abs_image_dir = os.path.dirname(abs_image_filepath)
-    abs_spritesheet_filepath = os.path.join(abs_image_dir, "spritesheets.txt")
+    abs_spritesheet_filepath = os.path.join(abs_image_dir, "definitions", "spritesheets.txt")
+
     rel_image_filepath = os.path.relpath(abs_image_filepath, start=bpy.path.abspath(get_asset_dir()))
     try:
         with open(abs_spritesheet_filepath, "r") as spritesheet_file:
@@ -46,7 +48,14 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
             # get selected file
             abs_filepath = active_browser.params.directory + active_browser.params.filename
             abs_img_dir = bpy.path.abspath(get_image_dir())
-            rel_filepath = os.path.relpath(abs_filepath, start=abs_img_dir)
+            in_img_dir = os.path.commonpath([abs_filepath, abs_img_dir]) == abs_img_dir
+
+            if in_img_dir:
+                rel_filepath = os.path.relpath(abs_filepath, start=abs_img_dir)
+            else:
+                # copy the file into the img folder
+                shutil.copy2(abs_filepath, abs_img_dir) # complete target filename given
+                rel_filepath = os.path.basename(abs_filepath)
 
             # if image, set texture of active object
             filename, file_ext = os.path.splitext(abs_filepath)
@@ -58,7 +67,7 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
                 image = tex_node.image
                 tile_size = tile_size or image.size
 
-                render_component = active_obj.lexgame.smithy.add_component("Renderer2D")
+                render_component = active_obj.lexgame.smithy.add_component("Render2D")
                 render_component.set_input("asset", os.path.splitext(rel_filepath)[0])
                 render_component.set_input("tile_size", list(tile_size))
 
