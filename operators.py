@@ -1,6 +1,7 @@
 import bpy
 import os
 import shutil
+import bmesh
 
 from .utils import *
 
@@ -81,3 +82,58 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
                 active_obj.scale.x *= aspect_ratio / cur_aspect_ratio
 
         return {'FINISHED'}
+
+def create_custom_mesh(objname, px, py, pz):
+        # vertices
+        points = [
+            (0.0, -1.0, 0.0), # BL
+            (1.0, -1.0, 0.0), # BR
+            (0.0, 0.0, 0.0),  # TL
+            (1.0, 0.0, 0.0)]  # TR
+
+        # faces
+        faces = [(0, 1, 3, 2)]
+
+        mesh = bpy.data.meshes.new(objname)
+        obj = bpy.data.objects.new(objname, mesh)
+
+        bpy.context.scene.collection.objects.link(obj)
+
+        # Generate mesh data
+        mesh.from_pydata(points, [], faces)
+        # Calculate the edges
+        mesh.update(calc_edges=True)
+
+        obj.location = (px, py, pz)
+        return obj
+
+class Lex2D_AddSprite(bpy.types.Operator):
+
+    """Add Lex2D Sprite"""
+    bl_idname = "mesh.lex2d_sprite_add"
+    bl_label = "Add Lex2D Sprite"
+    bl_options = {'REGISTER', 'UNDO', 'PRESET'}
+
+    def execute(self, context):
+        cursor_loc = bpy.context.scene.cursor.location
+        sprite = create_custom_mesh("Sprite", *cursor_loc)
+
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.context.view_layer.objects.active = sprite
+        sprite.select_set(state=True)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        return self.execute(context)
+
+
+def draw_item(self, context):
+    self.layout.operator("mesh.lex2d_sprite_add", icon="GHOST_ENABLED", text='Sprite')
+        
+
+def register():
+    bpy.types.VIEW3D_MT_mesh_add.prepend(draw_item)
+
+
+def unregister():
+    bpy.types.VIEW3D_MT_mesh_add.remove(draw_item)
