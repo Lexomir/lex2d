@@ -41,6 +41,14 @@ def unregister():
 
 
 _lex_suite = None
+def get_lex_suite():
+    global _lex_suite
+    if _lex_suite:
+        return _lex_suite
+    else:
+        _lex_suite = sys.modules.get('lex_suite')
+        return _lex_suite
+
 def __lex_suite_registered__(lex_suite_module):
     from .utils import _lex_suite_callbacks
     global _lex_suite

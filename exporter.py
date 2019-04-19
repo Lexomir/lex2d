@@ -69,8 +69,8 @@ def export_scene_states(scene, output_filepath):
                 #serialize_state += node.serialized_hierarchy
                 
                 try:
-                    from . import _lex_suite
-                    lex_smithy = _lex_suite.lex_game.smithy
+                    from . import get_lex_suite
+                    lex_smithy = get_lex_suite().lex_game.smithy
                     if not lex_smithy.state_script_exists(node.name):
                         lex_smithy.create_state_script(node.name)
                 except Exception as err:
