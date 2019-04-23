@@ -2,18 +2,18 @@ import bpy
 from .utils import *
 
 def serialize_obj_state(obj_state, line_prefix):
-    def convert_to_lua_value(datatype, string_val):
+    def convert_to_lua_value(datatype, val):
         if datatype == "string":
-            return "\"" + string_val + "\""
+            return "\"" + val + "\""
         elif datatype == "vec2":
-            return "{" + ",".join(string_val.split(",")[0:2]) + "}" 
+            return "{" + ",".join(map(str, val[0:2])) + "}" 
         elif datatype == "vec3":
-            return "{" + ",".join(string_val.split(",")[0:3]) + "}"
+            return "{" + ",".join(map(str, val[0:3])) + "}"
         elif datatype == "vec4":
-            return "{" + string_val + "}"
-        elif string_val in ["", None]:
+            return "{" + ",".join(map(str, val[0:4])) + "}"
+        elif val in ["", None]:
             return "nil"
-        return string_val
+        return val
 
     def convert_to_screen_position(blender_pos):
         return [(blender_pos[0] * 120), -(blender_pos[1] * 120), blender_pos[2]]
@@ -23,7 +23,6 @@ def serialize_obj_state(obj_state, line_prefix):
 
     serialized_state = "{}{{\n".format(line_prefix)
     serialized_state += "{}\tname = \"{}\",\n".format(line_prefix, obj_state.name)
-
     serialized_state += "{}\tcomponents = {{\n".format(line_prefix)
     
     # transform component
@@ -42,14 +41,21 @@ def serialize_obj_state(obj_state, line_prefix):
     for sc in obj_state.smithy_components_serialized:
         if sc.filepath:
             serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, sc.filepath)
+            
+            from . import get_lex_suite
+            lex_game = get_lex_suite().lex_game
+            component = lex_game.smithy.get_component_system().get_or_create_component(sc.filepath)
+            lex_game.smithy.get_component_system().recompile_component_if_changed(component)
 
-            sinputs = sc.data.split("\n")
-            for si in sinputs:
+            stored_inputs = lex_game.inputs_from_serialized_component(sc)
+            inputs = lex_game.override_script_inputs(base_inputs=component.inputs, overrides=stored_inputs)
+
+            for i in inputs:
                 try:
-                    input_name, input_datatype, input_str_value = si.split(",", 2)
-                    serialized_state += "{}\t\t\t[\"{}\"]={},\n".format(line_prefix, input_name, convert_to_lua_value(input_datatype, input_str_value))
+                    input_name, input_datatype, input_value, input_args = i
+                    serialized_state += "{}\t\t\t[\"{}\"]={},\n".format(line_prefix, input_name, convert_to_lua_value(input_datatype, input_value))
                 except:
-                    print("ERROR: Invalid component input in a state for object '{}', component '{}', input ['{}']".format(obj_state.name, sc.filepath, si))
+                    print("ERROR: Invalid component input in a state for object '{}', component '{}', input ['{}']".format(obj_state.name, sc.filepath, i[0]))
                     raise
 
         serialized_state += "{}\t\t}},\n".format(line_prefix) # end component 
@@ -68,6 +74,7 @@ def export_scene_states(scene, output_filepath):
             for node in nodegroup.nodes:
                 #serialize_state += node.serialized_hierarchy
                 
+                # create state script if it doesnt exist
                 try:
                     from . import get_lex_suite
                     lex_smithy = get_lex_suite().lex_game.smithy
@@ -77,8 +84,9 @@ def export_scene_states(scene, output_filepath):
                     print(err)
                     raise
                     
+                # export state node
                 serialized_scene += "\t[\"{}\"] = {{\n".format(node.name)
-                serialized_scene += "\t\tobjects = {\n"
+                serialized_scene += "\t\tobjects = {\n"  # object list
 
                 obj_states = node.object_states
                 for obj_state in obj_states:
@@ -86,7 +94,7 @@ def export_scene_states(scene, output_filepath):
                 
                 serialized_scene += "\t\t}\n\t},\n"  # end object list
 
-            serialized_scene += "}\n" # end scene list
+            serialized_scene += "}\n" # end state list
             f.write(serialized_scene)
                 
 
@@ -98,9 +106,8 @@ class export_scene_states_operator(bpy.types.Operator):
         blend_name = bpy.path.display_name(bpy.data.filepath)
         output_filepath = "{}/{}.lua".format(get_asset_dir(), blend_name)
         try:
-            for scene in bpy.data.scenes:
-                scene.lexsm.get_nodegroup().save_current_state()
             export_scene_states(context.scene, output_filepath)
-        except:
+        except Exception as err:
+            print(err)
             self.report({"ERROR"}, "Error encountered while exporting scene states. See Console.")
         return {'FINISHED'}

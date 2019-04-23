@@ -58,8 +58,8 @@ def set_material_image_texture(obj, image_filepath, tile_size=None):
     tex_coord_node = get_or_create_input_node(material.node_tree, mapping_node, "ShaderNodeTexCoord", "UV", "Vector")
 
     mapping_node.vector_type = "TEXTURE"
-    tile_count_x = round(image.size[0] / tile_size[0])
-    tile_count_y = round(image.size[1] / tile_size[1])
+    tile_count_x = round(image.size[0] / tile_size[0], 3)
+    tile_count_y = round(image.size[1] / tile_size[1], 3)
 
     mapping_node.scale[0] = tile_count_x
     mapping_node.scale[1] = tile_count_y
@@ -95,12 +95,4 @@ def get_image_dir():
 
 def get_asset_dir():
     return "//gamedata/"
-
-_lex_suite_callbacks = []
-def add_lex_suite_registered_callback(callback):
-    lex_suite = sys.modules.get("lex_suite")
-    if lex_suite:
-        callback(lex_suite)
-    else:
-        _lex_suite_callbacks.append(callback)
 

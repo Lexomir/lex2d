@@ -15,6 +15,7 @@ def _obj_component_updated(obj, smithy_component_instance):
 
             for ext in ['.png', '.jpg']:
                 if os.path.exists(bpy.path.abspath(spritesheet_filepath + ext)):
+                    print("Lex2D: Updating Texture '{}'".format(rel_spritesheet_filepath))
                     set_material_image_texture(obj, spritesheet_filepath + ext, tile_size=smithy_component_instance.get_input('tile_size'))
                     break
     
@@ -25,7 +26,7 @@ def _on_lex_suite_registered(lex_suite):
     lex_suite.lex_game.smithy.add_component_updated_callback(_obj_component_updated)
 
 def register():
-    print("Registered Lex2D")
+    from . import add_lex_suite_registered_callback
     add_lex_suite_registered_callback(_on_lex_suite_registered)
 
 
