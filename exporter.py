@@ -114,7 +114,7 @@ class export_scene_states_operator(bpy.types.Operator):
 
     def execute(self, context):
         blend_name = bpy.path.display_name(bpy.data.filepath)
-        output_filepath = "{}/{}.lua".format(get_asset_dir(), blend_name)
+        output_filepath = "{}/assets/scripts/scene_states.lua".format(get_asset_dir())
         try:
             export_scene_states(context.scene, output_filepath)
         except Exception as err:
