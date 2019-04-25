@@ -9,14 +9,25 @@ import os
 
 def _obj_component_updated(obj, smithy_component_instance):
     if smithy_component_instance.filepath == "Render2D":
-        rel_spritesheet_filepath = smithy_component_instance.get_input('asset')
-        if rel_spritesheet_filepath:
-            spritesheet_filepath = get_image_dir() + rel_spritesheet_filepath
+        rel_img_filepath = smithy_component_instance.get_input('asset')
+        if rel_img_filepath:
+            abs_img_filepath = os.path.join(get_image_dir(), rel_img_filepath)
 
             for ext in ['.png', '.jpg']:
-                if os.path.exists(bpy.path.abspath(spritesheet_filepath + ext)):
-                    print("Lex2D: Updating Texture '{}'".format(rel_spritesheet_filepath))
-                    set_material_image_texture(obj, spritesheet_filepath + ext, tile_size=smithy_component_instance.get_input('tile_size'))
+                if os.path.exists(bpy.path.abspath(abs_img_filepath + ext)):
+                    spritesheet_data = find_spritesheet_data_for_image(rel_img_filepath + ext)
+                    tile_size = spritesheet_data['tile_size'] if spritesheet_data else None
+                    mat, tex_node = set_material_image_texture(obj, abs_img_filepath + ext, tile_size=tile_size)
+                    image = tex_node.image
+                    tile_size = tile_size or image.size
+
+                    # Regenerate mesh data
+                    bm = create_rectangle_bmesh(screen_to_bl_size(tile_size))
+                    mode = bpy.context.mode
+                    bpy.ops.object.mode_set(mode='OBJECT')
+                    bm.to_mesh(obj.data)
+                    bpy.ops.object.mode_set(mode=mode)
+                    bm.free()
                     break
     
 

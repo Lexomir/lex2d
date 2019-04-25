@@ -13,7 +13,7 @@ def serialize_obj_state(obj_state, line_prefix):
             return "{" + ",".join(map(str, val[0:4])) + "}"
         elif val in ["", None]:
             return "nil"
-        return val
+        return str(val)
 
     def convert_to_screen_position(blender_pos):
         return [(blender_pos[0] * 120), -(blender_pos[1] * 120), blender_pos[2]]
@@ -28,10 +28,11 @@ def serialize_obj_state(obj_state, line_prefix):
     # transform component
     serialized_state += "{}\t\t[\"Transform\"] = {{\n".format(line_prefix)
 
+    obj_size = obj_state.dimensions if is_renderable(obj_state) else obj_state.scale
     transform_inputs = [
-        ('position', 'vec3', ",".join([str(round(v, 3)) for v in convert_to_screen_position(obj_state.location)])), 
-        ('rotation_quat', 'vec4', ",".join([str(round(v, 3)) for v in obj_state.rotation_quaternion])), 
-        ('size', 'vec3', ",".join([str(round(v, 3)) for v in convert_to_screen_size(obj_state.scale)]))]
+        ('position', 'vec3', [round(v, 3) for v in convert_to_screen_position(obj_state.location)]), 
+        ('rotation_quat', 'vec4', [round(v, 3) for v in obj_state.rotation_quaternion]), 
+        ('size', 'vec3', [round(v, 3) for v in convert_to_screen_size(obj_size)])]
     for i_n, i_t, i_v in transform_inputs:
         serialized_state += "{}\t\t\t[\"{}\"]={},\n".format(line_prefix, i_n, convert_to_lua_value(i_t, i_v))
 
@@ -86,6 +87,14 @@ def export_scene_states(scene, output_filepath):
                     
                 # export state node
                 serialized_scene += "\t[\"{}\"] = {{\n".format(node.name)
+
+                serialized_scene += "\t\t{} = {{\n".format("next_states")
+                for node_output in node.outputs:
+                    if node_output.links:
+                        connected_state = node_output.links[0].to_node
+                        serialized_scene += "\t\t\t\"{}\",\n".format(connected_state.name)
+                serialized_scene += "\t\t}},\n".format("next_states")
+                
                 serialized_scene += "\t\tobjects = {\n"  # object list
 
                 obj_states = node.object_states

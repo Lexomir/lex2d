@@ -7,29 +7,6 @@ from .utils import *
 
 
 
-def find_spritesheet_data_for_image(image_filepath):
-    # find spritesheet file
-    abs_image_filepath = bpy.path.abspath(get_image_dir() + image_filepath)
-    abs_image_dir = os.path.dirname(abs_image_filepath)
-    abs_spritesheet_filepath = os.path.join(abs_image_dir, "definitions", "spritesheets.txt")
-
-    rel_image_filepath = os.path.relpath(abs_image_filepath, start=bpy.path.abspath(get_asset_dir()))
-    try:
-        with open(abs_spritesheet_filepath, "r") as spritesheet_file:
-            for line in spritesheet_file:
-                line_parts = line.split(" ")
-                referenced_image_rel_filepath = line_parts[2]
-                if line_parts[0] == 'png_sheet' and os.path.normcase(referenced_image_rel_filepath) == os.path.normcase(rel_image_filepath):
-                    try: tile_size = (int(line_parts[3]), int(line_parts[4]))
-                    except: return None
-
-                    return {"tile_size": tile_size}
-    except FileNotFoundError:
-        return None
-    except: 
-        print('Unhandled error: %s' % sys.exc_info()[0])
-        return None
-
 class SetTextureFromFileBrowser(bpy.types.Operator):
     bl_idname = 'lex2d.set_texture_from_file_browser'
     bl_label = "Lex2D Set Texture From File Browser"
@@ -74,38 +51,39 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
 
                 render_component = active_obj.lexgame.smithy.add_component("Render2D")
                 render_component.set_input("asset", os.path.splitext(rel_filepath)[0])
-                render_component.set_input("tile_size", list(tile_size))
 
                 # resize the plane
                 cur_aspect_ratio = active_obj.scale.x / active_obj.scale.y
                 aspect_ratio = tile_size[0] / tile_size[1]
-                active_obj.scale.x *= aspect_ratio / cur_aspect_ratio
+
+                # Regenerate mesh data
+                bm = create_rectangle_bmesh(screen_to_bl_size(tile_size))
+                
+                mode = bpy.context.mode
+                bpy.ops.object.mode_set(mode='OBJECT')
+                bm.to_mesh(active_obj.data)
+                bpy.ops.object.mode_set(mode=mode)
+                
+                bm.free()
 
         return {'FINISHED'}
 
-def create_custom_mesh(objname, px, py, pz):
-        # vertices
-        points = [
-            (0.0, -1.0, 0.0), # BL
-            (1.0, -1.0, 0.0), # BR
-            (0.0, 0.0, 0.0),  # TL
-            (1.0, 0.0, 0.0)]  # TR
 
-        # faces
-        faces = [(0, 1, 3, 2)]
+def create_rectangle(objname, location, size):
+    points, faces, uvs = rectangle_mesh_data(size)
 
-        mesh = bpy.data.meshes.new(objname)
-        obj = bpy.data.objects.new(objname, mesh)
+    mesh = bpy.data.meshes.new(objname)
+    obj = bpy.data.objects.new(objname, mesh)
 
-        bpy.context.scene.collection.objects.link(obj)
+    bpy.context.scene.collection.objects.link(obj)
 
-        # Generate mesh data
-        mesh.from_pydata(points, [], faces)
-        # Calculate the edges
-        mesh.update(calc_edges=True)
+    # Generate mesh data
+    mesh.from_pydata(points, [], faces)
+    # Calculate the edges
+    mesh.update(calc_edges=True)
 
-        obj.location = (px, py, pz)
-        return obj
+    obj.location = location
+    return obj
 
 class Lex2D_AddSprite(bpy.types.Operator):
 
@@ -116,7 +94,7 @@ class Lex2D_AddSprite(bpy.types.Operator):
 
     def execute(self, context):
         cursor_loc = bpy.context.scene.cursor.location
-        sprite = create_custom_mesh("Sprite", *cursor_loc)
+        sprite = create_rectangle("Sprite", cursor_loc, (1, 1))
 
         bpy.ops.object.select_all(action='DESELECT')
         bpy.context.view_layer.objects.active = sprite

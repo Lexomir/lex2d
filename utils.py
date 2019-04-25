@@ -1,5 +1,7 @@
 import bpy
 import sys
+import os
+import bmesh
 
 
 def set_active_material_output(my_node):
@@ -88,6 +90,70 @@ def get_material_image(obj):
     
     return None
 
+def find_spritesheet_data_for_image(image_filepath):
+    # find spritesheet file
+    abs_image_filepath = bpy.path.abspath(get_image_dir() + image_filepath)
+    abs_image_dir = os.path.dirname(abs_image_filepath)
+    abs_spritesheet_filepath = os.path.join(abs_image_dir, "definitions", "spritesheets.txt")
+
+    rel_image_filepath = os.path.relpath(abs_image_filepath, start=bpy.path.abspath(get_asset_dir()))
+    try:
+        with open(abs_spritesheet_filepath, "r") as spritesheet_file:
+            for line in spritesheet_file:
+                line_parts = line.split(" ")
+                referenced_image_rel_filepath = line_parts[2]
+                if line_parts[0] == 'png_sheet' and os.path.normcase(referenced_image_rel_filepath) == os.path.normcase(rel_image_filepath):
+                    try: tile_size = (int(line_parts[3]), int(line_parts[4]))
+                    except: return None
+
+                    return {"tile_size": tile_size}
+    except FileNotFoundError:
+        return None
+    except: 
+        print('Unhandled error: %s' % sys.exc_info()[0])
+        return None
+
+def rectangle_mesh_data(size):
+    # vertices
+    points = [
+        (0.0, -size[1], 0.0), # BL
+        (size[0], -size[1], 0.0), # BR
+        (0.0, 0.0, 0.0),  # TL
+        (size[0], 0.0, 0.0)]  # TR
+
+    uvs = [(0, 0), (1, 0), (1, 1), (0, 1)]
+    faces = [(0, 1, 3, 2)]
+    return points, faces, uvs
+
+def create_rectangle_bmesh(size):
+    bm = bmesh.new()
+    verts, faces, uvs = rectangle_mesh_data(size)
+    for v in verts:
+        bm.verts.new(v)
+    bm.verts.ensure_lookup_table()
+    bm.faces.new( (bm.verts[i] for i in faces[0]) )
+    bm.faces.ensure_lookup_table()
+
+    # add uvs to the new face
+    uv_layer = bm.loops.layers.uv.verify()
+    face = bm.faces[-1]
+    for i, loop in enumerate(face.loops):
+        loop[uv_layer].uv = uvs[i]
+    return bm
+
+def screen_to_bl_size(screen_size):
+    return [screen_size[0] / 120, screen_size[1] / 120, 1]
+
+def vec3_approx_equals(vec, other, ep=.001):
+    diff = [vec[0] - other[0], 
+            vec[1] - other[1],
+            vec[2] - other[2]]
+    for d in diff:
+        if abs(d) > ep: return False
+    return True
+
+def is_renderable(obj_state):
+    return not vec3_approx_equals(obj_state.dimensions, (0, 0, 0))
 
 # get filepath relative to the image folder
 def get_image_dir():
