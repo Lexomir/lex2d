@@ -87,13 +87,14 @@ def export_scene_states(scene, output_filepath):
                     
                 # export state node
                 serialized_scene += "\t[\"{}\"] = {{\n".format(node.name)
-
+                
+                # find attached states
                 serialized_scene += "\t\t{} = {{\n".format("next_states")
                 for node_output in node.outputs:
                     if node_output.links:
                         connected_state = node_output.links[0].to_node
                         serialized_scene += "\t\t\t\"{}\",\n".format(connected_state.name)
-                serialized_scene += "\t\t}},\n".format("next_states")
+                serialized_scene += "\t\t},\n"
                 
                 serialized_scene += "\t\tobjects = {\n"  # object list
 
