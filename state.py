@@ -23,10 +23,7 @@ def _obj_component_updated(obj, smithy_component_instance):
 
                     # Regenerate mesh data
                     bm = create_rectangle_bmesh(screen_to_bl_size(tile_size))
-                    mode = bpy.context.mode
-                    bpy.ops.object.mode_set(mode='OBJECT')
-                    bm.to_mesh(obj.data)
-                    bpy.ops.object.mode_set(mode=mode)
+                    apply_bmesh_to_object(obj, bm)
                     bm.free()
                     break
     

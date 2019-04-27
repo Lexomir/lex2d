@@ -25,6 +25,14 @@ def find_texture_node_with_image(nodes, image):
         if node.type == 'TEX_IMAGE' and node.image == image:
             return node
 
+def apply_bmesh_to_object(obj, bm):
+    active_obj = bpy.context.view_layer.objects.active
+    bpy.context.view_layer.objects.active = obj
+    mode = bpy.context.mode
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bm.to_mesh(obj.data)
+    bpy.ops.object.mode_set(mode=mode)
+    bpy.context.view_layer.objects.active = active_obj
 
 def get_or_create_input_node(node_tree, src_node, input_node_type, from_output_name, to_input_name):
     connected_node = None

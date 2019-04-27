@@ -58,12 +58,7 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
 
                 # Regenerate mesh data
                 bm = create_rectangle_bmesh(screen_to_bl_size(tile_size))
-                
-                mode = bpy.context.mode
-                bpy.ops.object.mode_set(mode='OBJECT')
-                bm.to_mesh(active_obj.data)
-                bpy.ops.object.mode_set(mode=mode)
-                
+                apply_bmesh_to_object(active_obj, bm)
                 bm.free()
 
         return {'FINISHED'}
