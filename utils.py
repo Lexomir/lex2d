@@ -49,6 +49,11 @@ def get_or_create_input_node(node_tree, src_node, input_node_type, from_output_n
     
     return connected_node
 
+def remove_all_except(bpy_collection, exceptions):
+    for item in bpy_collection:
+        if item not in exceptions:
+            bpy_collection.remove(item)
+
 def set_material_image_texture(obj, image_filepath, tile_size=None):
     # import image file
     image = bpy.data.images.load(bpy.path.relpath(image_filepath), check_existing=True)
@@ -59,7 +64,13 @@ def set_material_image_texture(obj, image_filepath, tile_size=None):
     material.use_nodes = True
 
     mat_output = get_active_material_output(material.node_tree.nodes)
-    texture_node = get_or_create_input_node(material.node_tree, mat_output, "ShaderNodeTexImage", "Color", "Surface")
+
+    # start from scratch if the output isnt connected to an emission node
+    if mat_output.inputs['Surface'].links and type(mat_output.inputs['Surface'].links[0].from_node).__name__ != "ShaderNodeEmission":
+        remove_all_except(material.node_tree.nodes, [mat_output])
+
+    emission_node = get_or_create_input_node(material.node_tree, mat_output, "ShaderNodeEmission", "Emission", "Surface")
+    texture_node = get_or_create_input_node(material.node_tree, emission_node, "ShaderNodeTexImage", "Color", "Color")
     texture_node.image = image
 
     # connect a mapping node (to only display one tile of the texture)
