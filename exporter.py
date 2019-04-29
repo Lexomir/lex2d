@@ -13,7 +13,7 @@ def serialize_obj_state(obj_state, line_prefix):
             return "{" + ",".join(map(str, val[0:4])) + "}"
         elif val in ["", None]:
             return "nil"
-        return str(val)
+        return "\"" + str(val) + "\""
 
     def convert_to_screen_position(blender_pos):
         return [(blender_pos[0] * 120), -(blender_pos[1] * 120), blender_pos[2]]
