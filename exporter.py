@@ -87,6 +87,7 @@ def export_scene_states(scene, output_filepath):
                     
                 # export state node
                 serialized_scene += "\t[\"{}\"] = {{\n".format(node.name)
+                serialized_scene += "\t\t{} = Engine.require(\"states/{}.lua\"),\n".format("script", node.name)
                 
                 # find attached states
                 serialized_scene += "\t\t{} = {{\n".format("next_states")
@@ -106,7 +107,15 @@ def export_scene_states(scene, output_filepath):
 
             serialized_scene += "}\n" # end state list
             f.write(serialized_scene)
-                
+
+
+def export_component_include_file(output_filepath):
+    with open(bpy.path.abspath(output_filepath), 'w') as f:
+        from . import get_lex_suite
+        lex_game = get_lex_suite().lex_game
+        components = lex_game.smithy.get_component_system().get_all_component_filepaths()
+        for c in components:
+            f.write('Component["{}"] = Engine.require("components/{}.lua")\n'.format(c, c))
 
 class export_scene_states_operator(bpy.types.Operator):
     bl_idname = "lex2d.export_scene_states"
@@ -117,6 +126,9 @@ class export_scene_states_operator(bpy.types.Operator):
         output_filepath = "{}/assets/scripts/scene_states.lua".format(get_asset_dir())
         try:
             export_scene_states(context.scene, output_filepath)
+
+            component_includes_filepath = "{}/assets/scripts/blend_includes.lua".format(get_asset_dir())
+            export_component_include_file(component_includes_filepath)
         except Exception as err:
             print(err)
             self.report({"ERROR"}, "Error encountered while exporting scene states. See Console.")

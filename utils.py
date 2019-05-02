@@ -62,7 +62,7 @@ def set_material_image_texture(obj, image_filepath, tile_size=None):
     if not material:
         material = bpy.data.materials.new(obj.name)
     material.use_nodes = True
-    material.blend_method = 'BLEND'
+    material.blend_method = 'CLIP'
 
     mat_output = get_active_material_output(material.node_tree.nodes)
 
