@@ -1,0 +1,16 @@
+local ${COMPONENT_NAME} = {}
+
+function ${COMPONENT_NAME}:start(args)
+    --
+end
+
+function ${COMPONENT_NAME}:update(dt)
+    --
+end
+
+function ${COMPONENT_NAME}:stop()
+    --
+end
+
+
+return ${COMPONENT_NAME}

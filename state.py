@@ -1,5 +1,6 @@
 import bpy
 from .utils import *
+from . import ecs
 from bpy.app.handlers import persistent
 import addon_utils
 import sys
@@ -29,13 +30,8 @@ def _obj_component_updated(obj, smithy_component_instance):
     
 
 
-@persistent
-def _on_lex_suite_registered(lex_suite):
-    lex_suite.lex_game.smithy.add_component_updated_callback(_obj_component_updated)
-
 def register():
-    from . import add_lex_suite_registered_callback
-    add_lex_suite_registered_callback(_on_lex_suite_registered)
+    ecs.add_component_updated_callback(_obj_component_updated)
 
 
 def unregister():

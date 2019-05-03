@@ -8,8 +8,8 @@ from .utils import *
 
 
 class SetTextureFromFileBrowser(bpy.types.Operator):
-    bl_idname = 'lex2d.set_texture_from_file_browser'
-    bl_label = "Lex2D Set Texture From File Browser"
+    bl_idname = 'smithy2d.set_texture_from_file_browser'
+    bl_label = "Smithy2D: Set Texture From File Browser"
 
     @classmethod
     def poll(cls, context):
@@ -49,7 +49,7 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
                 image = tex_node.image
                 tile_size = tile_size or image.size
 
-                render_component = active_obj.lexgame.smithy.add_component("Render2D")
+                render_component = active_obj.smithy2d.add_component("Render2D")
                 render_component.set_input("asset", os.path.splitext(rel_filepath)[0])
 
                 # resize the plane
@@ -80,11 +80,11 @@ def create_rectangle(objname, location, size):
     obj.location = location
     return obj
 
-class Lex2D_AddSprite(bpy.types.Operator):
+class Smithy2D_AddSprite(bpy.types.Operator):
 
-    """Add Lex2D Sprite"""
-    bl_idname = "mesh.lex2d_sprite_add"
-    bl_label = "Add Lex2D Sprite"
+    """Add Smithy2D Sprite"""
+    bl_idname = "mesh.smithy2d_sprite_add"
+    bl_label = "Add Smithy2D Sprite"
     bl_options = {'REGISTER', 'UNDO', 'PRESET'}
 
     def execute(self, context):
@@ -100,8 +100,66 @@ class Lex2D_AddSprite(bpy.types.Operator):
         return self.execute(context)
 
 
+class Smithy2D_EditAppliedStateScript(bpy.types.Operator):
+    bl_idname = 'smithy2d.edit_applied_smithy_state_script'
+    bl_label = "Smithy2D Edit Applied State Script"
+
+    @classmethod
+    def poll(cls, context):
+        return True
+    
+    def execute(self, context):
+        if not bpy.data.filepath:
+            self.report({"ERROR"}, "Save the project first. This operation needs a project folder.")
+            return {"CANCELLED"}
+
+        # get state name, find lua file
+        state_nodegroup = context.scene.smithy2d.get_statemachine()
+        state = state_nodegroup.find_applied_state_node() if state_nodegroup else None
+        
+        if not state:
+            return {"CANCELLED"}
+
+        if not state_script_exists(state.name):
+            create_state_script(state.name)
+
+        script_filepath = abs_state_scriptpath(state.name)
+        subprocess.run(['code', os.path.dirname(script_filepath), script_filepath], shell=True)
+
+        return {"FINISHED"}
+
+class Smithy2D_EditSelectedStateScript(bpy.types.Operator):
+    bl_idname = 'smithy2d.edit_selected_state_script'
+    bl_label = "Smithy2D Edit Selected State Script"
+
+    @classmethod
+    def poll(cls, context):
+        return True
+    
+    def execute(self, context):
+        if not bpy.data.filepath:
+            self.report({"ERROR"}, "Save the project first. This operation needs a project folder.")
+            return {"CANCELLED"}
+
+        # get state name, find lua file
+        state_nodegroup = context.scene.smithy2d.get_statemachine()
+        state = state_nodegroup.nodes.active if state_nodegroup else None
+        
+        if not state:
+            return {"CANCELLED"}
+        
+        if not state_script_exists(state.name):
+            create_state_script(state.name)
+
+        script_filepath = abs_state_scriptpath(state.name)
+        subprocess.run(['code', os.path.dirname(script_filepath), script_filepath], shell=True)
+
+        return {"FINISHED"}
+
+
+
 def draw_item(self, context):
-    self.layout.operator("mesh.lex2d_sprite_add", icon="GHOST_ENABLED", text='Sprite')
+    self.layout.operator("mesh.smithy2d_sprite_add", icon="GHOST_ENABLED", text='Sprite')
         
 
 def register():

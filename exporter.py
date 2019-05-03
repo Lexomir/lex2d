@@ -1,5 +1,6 @@
 import bpy
 from .utils import *
+from . import ecs
 
 def serialize_obj_state(obj_state, line_prefix):
     def convert_to_lua_value(datatype, val):
@@ -13,6 +14,8 @@ def serialize_obj_state(obj_state, line_prefix):
             return "{" + ",".join(map(str, val[0:4])) + "}"
         elif val in ["", None]:
             return "nil"
+        elif datatype == "float":
+            return str(val)
         return "\"" + str(val) + "\""
 
     def convert_to_screen_position(blender_pos):
@@ -39,17 +42,15 @@ def serialize_obj_state(obj_state, line_prefix):
     serialized_state += "{}\t\t}},\n".format(line_prefix) # end component
 
     # other components
-    for sc in obj_state.smithy_components_serialized:
+    for sc in obj_state.components_serialized:
         if sc.filepath:
             serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, sc.filepath)
             
-            from . import get_lex_suite
-            lex_game = get_lex_suite().lex_game
-            component = lex_game.smithy.get_component_system().get_or_create_component(sc.filepath)
-            lex_game.smithy.get_component_system().recompile_component_if_changed(component)
+            component = ecs.component_system.get_or_create_component(sc.filepath)
+            ecs.component_system.recompile_component_if_changed(component)
 
-            stored_inputs = lex_game.inputs_from_serialized_component(sc)
-            inputs = lex_game.override_script_inputs(base_inputs=component.inputs, overrides=stored_inputs)
+            stored_inputs = ecs.inputs_from_serialized_component(sc)
+            inputs = ecs.override_script_inputs(base_inputs=component.inputs, overrides=stored_inputs)
 
             for i in inputs:
                 try:
@@ -67,7 +68,7 @@ def serialize_obj_state(obj_state, line_prefix):
 
 
 def export_scene_states(scene, output_filepath):
-    nodegroup = scene.lexsm.get_nodegroup()
+    nodegroup = scene.smithy2d.get_statemachine()
     if nodegroup:
         nodegroup.save_current_state()
         with open(bpy.path.abspath(output_filepath), 'w') as f:
@@ -77,10 +78,8 @@ def export_scene_states(scene, output_filepath):
                 
                 # create state script if it doesnt exist
                 try:
-                    from . import get_lex_suite
-                    lex_smithy = get_lex_suite().lex_game.smithy
-                    if not lex_smithy.state_script_exists(node.name):
-                        lex_smithy.create_state_script(node.name)
+                    if not state_script_exists(node.name):
+                        create_state_script(node.name)
                 except Exception as err:
                     print(err)
                     raise
@@ -111,23 +110,19 @@ def export_scene_states(scene, output_filepath):
 
 def export_component_include_file(output_filepath):
     with open(bpy.path.abspath(output_filepath), 'w') as f:
-        from . import get_lex_suite
-        lex_game = get_lex_suite().lex_game
-        components = lex_game.smithy.get_component_system().get_all_component_filepaths()
+        components = ecs.get_component_system().get_all_component_filepaths()
         for c in components:
             f.write('Component["{}"] = Engine.require("components/{}.lua")\n'.format(c, c))
 
 class export_scene_states_operator(bpy.types.Operator):
-    bl_idname = "lex2d.export_scene_states"
-    bl_label = "Lex2D Export Scene States"
+    bl_idname = "smithy2d.export_scene_states"
+    bl_label = "Smithy2D Export Scene States"
 
     def execute(self, context):
-        blend_name = bpy.path.display_name(bpy.data.filepath)
-        output_filepath = "{}/assets/scripts/scene_states.lua".format(get_asset_dir())
+        scene_states_filepath = "{}/assets/scripts/scene_states.lua".format(get_asset_dir())
+        component_includes_filepath = "{}/assets/scripts/blend_includes.lua".format(get_asset_dir())
         try:
-            export_scene_states(context.scene, output_filepath)
-
-            component_includes_filepath = "{}/assets/scripts/blend_includes.lua".format(get_asset_dir())
+            export_scene_states(context.scene, scene_states_filepath)
             export_component_include_file(component_includes_filepath)
         except Exception as err:
             print(err)

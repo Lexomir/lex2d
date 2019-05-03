@@ -11,7 +11,6 @@ def set_active_material_output(my_node):
             node.is_active_output = False
     my_node.is_active_output = True
 
-
 def get_active_material_output(nodes):   
     for node in nodes :
         if node.type == 'OUTPUT_MATERIAL' and node.is_active_output :
@@ -175,6 +174,24 @@ def vec3_approx_equals(vec, other, ep=.001):
 def is_renderable(obj_state):
     return not vec3_approx_equals(obj_state.dimensions, (0, 0, 0))
 
+def state_script_exists(state_name):
+    script_filepath = abs_state_scriptpath(state_name)
+    return os.path.exists(script_filepath)
+
+def create_state_script(state_name):
+    template_filepath = os.path.normpath(os.path.abspath(os.path.dirname(__file__) + "/templates/smithy_state_script_template.txt"))
+    with open(template_filepath, "r") as template_file:
+        script_template = template_file.read()
+
+    output_filepath = abs_state_scriptpath(state_name)
+    os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
+    print("Making State Script: ", output_filepath)
+
+    with open(output_filepath, "w") as script_file:
+        script_file.write(script_template)
+
+    return output_filepath
+
 # get filepath relative to the image folder
 def get_image_dir():
     return "//gamedata/img/"
@@ -182,3 +199,8 @@ def get_image_dir():
 def get_asset_dir():
     return "//gamedata/"
 
+def abs_component_scriptpath(local_path):
+    return bpy.path.abspath("//") + "gamedata/assets/scripts/components/" + local_path + ".lua"
+
+def abs_state_scriptpath(state_name):
+    return bpy.path.abspath("//") + "gamedata/assets/scripts/states/" + state_name + ".lua"
