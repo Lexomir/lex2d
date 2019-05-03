@@ -150,7 +150,6 @@ def _on_blend_load_post(dummy):
                     new_ng.links.new(to_node.inputs[-1], n.outputs[output_i])
 
         # get any lexsm_nodetree node editor space and change to smithy2d_nodetree
-        print(len(bpy.context.screen.areas), bpy.context.screen.areas)
         for area in out_of_date_node_editors:
             area_nodetree = area.spaces.active.node_tree
             if area_nodetree and area_nodetree == old_ng:
