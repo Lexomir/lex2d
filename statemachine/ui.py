@@ -42,11 +42,6 @@ class Smithy2D_SM_PT_SceneStateNodePanel(bpy.types.Panel):
         layout.prop(node, "lex_name", text="Name")
         layout.operator('smithy2d.edit_selected_state_script', text="Edit Script")
 
-        for obj_s in node.object_states:
-            layout.label(text="{}: ({}, {}, {})".format(obj_s.name, *obj_s.location))
-            for sc in obj_s.components_serialized:
-                layout.label(text=sc.filepath + "," + sc.data)
-
 
 # hide the standard node prop panel if it's a smithy stategraph
 @classmethod
