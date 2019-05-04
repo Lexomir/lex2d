@@ -56,7 +56,7 @@ class Smithy2D_SM_SceneStateNode(bpy.types.Node, Smithy2D_SM_BaseStateNode):
                 state.load(obj)
 
     def set_lex_name_and_update(self, val):
-        from .. import _scene_state_namechange_callbacks
+        from . import _scene_state_namechange_callbacks
         old_name = self.get('lex_name', self.name)
         self['lex_name'] = val
         
