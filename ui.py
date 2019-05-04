@@ -1,8 +1,9 @@
 import bpy
 import subprocess
 import sys
+import os
 from . import uibase
-
+from .utils import abs_component_scriptpath
 
 class Smithy2D_ComponentListAction(bpy.types.Operator, uibase.LexBaseListAction):
     bl_idname = "lexlistaction.smithy2d_component_list_action"
