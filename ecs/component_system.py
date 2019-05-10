@@ -55,6 +55,7 @@ def parse_input(input_str):
         return (name, 'vec4', vec, []), None
     # expect format:  --$my_name(string, default)
     def parse_string(name, *args, **kwargs):
+        if len(args) > 0: kwargs['default'] = args[0]
         kwargs.setdefault("default", "")
         return (name, 'string', kwargs['default'], []), None
     # expect format:  --$my_name(bool, default)

@@ -102,7 +102,7 @@ class Smithy2D_RoomSelector(bpy.types.Operator):
                     break
             for area in editor_areas:
                 area.tag_redraw()
-        if event.type == 'RIGHTMOUSE':
+        if event.type == 'RIGHTMOUSE' and event.value == "PRESS":
             if _editor_area:
                 for i, room in enumerate(bpy.context.scene.smithy2d.rooms):
                     if room.contains(_mouse_view_location):
