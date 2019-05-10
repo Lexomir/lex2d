@@ -19,9 +19,9 @@ def parse_input(input_str):
     # expect format:  --$my_name(int, min, max, default)
     def parse_int(name, *args, **kwargs):
         kwargs.setdefault("default", 0)
-        if len(args) > 0: kwargs['min'] = args[0]
-        if len(args) > 1: kwargs['max'] = args[1]
-        if len(args) > 2: kwargs['default'] = args[2]
+        if len(args) > 0: kwargs['default'] = args[0]
+        if len(args) > 1: kwargs['min'] = args[1]
+        if len(args) > 2: kwargs['max'] = args[2]
         kwargs.setdefault("default", 0)
         kwargs.setdefault("min", -inf)
         kwargs.setdefault("max", inf)

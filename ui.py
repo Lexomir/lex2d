@@ -2,7 +2,7 @@ import bpy
 import subprocess
 import sys
 import os
-from . import uibase
+from . import uibase, ecs
 from .utils import *
 
 class Smithy2D_ComponentListAction(bpy.types.Operator, uibase.LexBaseListAction):
@@ -175,16 +175,16 @@ class Smithy2D_NewComponentScript(bpy.types.Operator):
             print("making", output_filepath)
 
             with open(output_filepath, "w") as script_file:
-                component_name = os.path.basename(script_name)
+                component_name = bpy_component.name
                 parsed_template = component_template.replace("${COMPONENT_NAME}", component_name)
                 script_file.write(parsed_template)
             
-            return script_name
+            return component_name
 
         c_index = context.object.smithy2d.active_component_index
         if c_index >= 0:
             c = context.object.smithy2d.components[c_index]
             create_component_script(c)
-            c.refresh()
+            ecs.get_component_system().refresh_inputs(c)
             bpy.ops.smithy2d.open_component_script_external()
         return {"FINISHED"}
