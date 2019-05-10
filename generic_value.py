@@ -89,16 +89,16 @@ class GenericValue:
     def get_vec4(self): return self._get_value_as_vec4()
 
 
-    def set_value(self, val):
-        if self.datatype == 'int': return self._set_value_as_int(val)
-        elif self.datatype == 'float': return self._set_value_as_float(val)
-        elif self.datatype == 'object': return self._set_string_value(val.name)
-        elif self.datatype == 'bool': return self._set_value_as_bool(val)
-        elif self.datatype == 'string': return self._set_string_value(val)
-        elif self.datatype == 'enum': return self._set_string_value(val)
-        elif self.datatype == 'vec2': return self._set_value_as_vec4([val[0], val[1], 0, 0])
-        elif self.datatype == 'vec3': return self._set_value_as_vec4([val[0], val[1], val[2], 0])
-        elif self.datatype == 'vec4': return self._set_value_as_vec4(val)
+    def set_value(self, val, propagate=False):
+        if self.datatype == 'int': return self._set_value_as_int(val, propagate=propagate)
+        elif self.datatype == 'float': return self._set_value_as_float(val, propagate=propagate)
+        elif self.datatype == 'object': return self._set_string_value(val.name, propagate=propagate)
+        elif self.datatype == 'bool': return self._set_value_as_bool(val, propagate=propagate)
+        elif self.datatype == 'string': return self._set_string_value(val, propagate=propagate)
+        elif self.datatype == 'enum': return self._set_string_value(val, propagate=propagate)
+        elif self.datatype == 'vec2': return self._set_value_as_vec4([val[0], val[1], 0, 0], propagate=propagate)
+        elif self.datatype == 'vec3': return self._set_value_as_vec4([val[0], val[1], val[2], 0], propagate=propagate)
+        elif self.datatype == 'vec4': return self._set_value_as_vec4(val, propagate=propagate)
         else: raise ValueError("Oh NO: '{}'".format(self.datatype))
 
     def get_value(self):

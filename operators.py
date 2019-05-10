@@ -49,7 +49,7 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
                 image = tex_node.image
                 tile_size = tile_size or image.size
 
-                render_component = active_obj.smithy2d.add_component("Render2D")
+                render_component = active_obj.smithy2d.add_component("Render2D", is_global=True)
                 render_component.set_input("asset", os.path.splitext(rel_filepath)[0])
 
                 # resize the plane
@@ -100,9 +100,9 @@ class Smithy2D_AddSprite(bpy.types.Operator):
         return self.execute(context)
 
 
-class Smithy2D_EditAppliedStateScript(bpy.types.Operator):
-    bl_idname = 'smithy2d.edit_applied_smithy_state_script'
-    bl_label = "Smithy2D Edit Applied State Script"
+class Smithy2D_EditSelectedRoomScript(bpy.types.Operator):
+    bl_idname = 'smithy2d.edit_selected_room_script'
+    bl_label = "Smithy2D Edit Selected Room Script"
 
     @classmethod
     def poll(cls, context):
@@ -112,46 +112,18 @@ class Smithy2D_EditAppliedStateScript(bpy.types.Operator):
         if not bpy.data.filepath:
             self.report({"ERROR"}, "Save the project first. This operation needs a project folder.")
             return {"CANCELLED"}
-
+        
+        room = bpy.context.scene.smithy2d.get_active_room()
+        if not room:
+            self.report({"ERROR"}, "Create a room first. This operation needs a room folder.")
+            return {"CANCELLED"}
+        
         # get state name, find lua file
-        state_nodegroup = context.scene.smithy2d.get_statemachine()
-        state = state_nodegroup.find_applied_state_node() if state_nodegroup else None
-        
-        if not state:
-            return {"CANCELLED"}
+        variant = room.get_active_variant()
+        if not room_script_exists(room.name, variant.name):
+            create_room_script(room.name, variant.name)
 
-        if not state_script_exists(state.name):
-            create_state_script(state.name)
-
-        script_filepath = abs_state_scriptpath(state.name)
-        subprocess.run(['code', os.path.dirname(script_filepath), script_filepath], shell=True)
-
-        return {"FINISHED"}
-
-class Smithy2D_EditSelectedStateScript(bpy.types.Operator):
-    bl_idname = 'smithy2d.edit_selected_state_script'
-    bl_label = "Smithy2D Edit Selected State Script"
-
-    @classmethod
-    def poll(cls, context):
-        return True
-    
-    def execute(self, context):
-        if not bpy.data.filepath:
-            self.report({"ERROR"}, "Save the project first. This operation needs a project folder.")
-            return {"CANCELLED"}
-
-        # get state name, find lua file
-        state_nodegroup = context.scene.smithy2d.get_statemachine()
-        state = state_nodegroup.nodes.active if state_nodegroup else None
-        
-        if not state:
-            return {"CANCELLED"}
-        
-        if not state_script_exists(state.name):
-            create_state_script(state.name)
-
-        script_filepath = abs_state_scriptpath(state.name)
+        script_filepath = asset_abspath(room_script_assetpath(room.name, variant.name))
         subprocess.run(['code', os.path.dirname(script_filepath), script_filepath], shell=True)
 
         return {"FINISHED"}

@@ -20,6 +20,13 @@ class LexBaseListAction:
     def on_add(self, added_item): pass
 
     def on_remove(self, removed_item): pass
+    
+    # arg: propagate (should this trigger callbacks) -- e.g. moving an item up and down shouldn't be considered a selection change
+    def set_index(self, index, propagate): 
+        index_src = self.get_index_source()
+        index_property_name = self.get_index_property()
+        setattr(index_src, index_property_name, index)
+
 
     def execute(self, context):
         collection = self.get_collection()
@@ -31,19 +38,19 @@ class LexBaseListAction:
 
         if self.action == 'DOWN' and idx < len(collection) - 1:
             collection.move(idx, idx + 1)
-            setattr(index_src, index_property_name, idx + 1)
+            self.set_index(idx + 1, propagate=False)
         elif self.action == 'UP' and idx >= 1:
             item_prev = collection[idx - 1]
             collection.move(idx, idx - 1)
-            setattr(index_src, index_property_name, idx - 1)
+            self.set_index(idx - 1, propagate=False)
         elif self.action == 'REMOVE' and item:
             if idx != 0 or len(collection) == 1:
-                setattr(index_src, index_property_name, idx - 1)
+                self.set_index(idx - 1, propagate=True)
             self.on_remove(item)
             collection.remove(idx)
         elif self.action == 'ADD':
             item = collection.add()
             item.name = ""
             self.on_add(item)
-            setattr(index_src, index_property_name, len(collection) - 1)
+            self.set_index(len(collection) - 1, propagate=True)
         return {"FINISHED"}

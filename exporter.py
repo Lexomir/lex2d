@@ -43,10 +43,11 @@ def serialize_obj_state(obj_state, line_prefix):
 
     # other components
     for sc in obj_state.components_serialized:
-        if sc.filepath:
-            serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, sc.filepath)
+        if sc.name:
+            serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, sc.name)
             
-            component = ecs.component_system.get_or_create_component(sc.filepath)
+            scene = obj_state.id_data
+            component = ecs.component_system.get_or_create_component(sc.get_assetpath(scene, obj_state.get_variant().get_room()))
             ecs.component_system.recompile_component_if_changed(component)
 
             stored_inputs = ecs.inputs_from_serialized_component(sc)
@@ -57,9 +58,9 @@ def serialize_obj_state(obj_state, line_prefix):
                     input_name, input_datatype, input_value, input_args = i
                     serialized_state += "{}\t\t\t[\"{}\"]={},\n".format(line_prefix, input_name, convert_to_lua_value(input_datatype, input_value))
                 except:
-                    print("ERROR: Invalid component input in a state for object '{}', component '{}', input ['{}']".format(obj_state.name, sc.filepath, i[0]))
+                    print("ERROR: Invalid component input in a state for object '{}', component '{}', input ['{}']".format(
+                        obj_state.name, sc.get_assetpath(scene, obj_state.get_room()), i[0]))
                     raise
-
         serialized_state += "{}\t\t}},\n".format(line_prefix) # end component 
 
     serialized_state += line_prefix + "\t}\n" # end component list
@@ -68,51 +69,46 @@ def serialize_obj_state(obj_state, line_prefix):
 
 
 def export_scene_states(scene, output_filepath):
-    nodegroup = scene.smithy2d.get_statemachine()
-    if nodegroup:
-        nodegroup.save_current_state()
-        with open(bpy.path.abspath(output_filepath), 'w') as f:
-            serialized_scene = "return {\n"
-            for node in nodegroup.nodes:
-                #serialize_state += node.serialized_hierarchy
-                
+    room = scene.smithy2d.get_active_room()
+    if room:
+        variant = room.get_active_variant()
+        if variant: 
+            variant.save_scene_state(scene)
+    with open(bpy.path.abspath(output_filepath), 'w') as f:
+        serialized_scene = "return {\n"
+        for room in scene.smithy2d.rooms:
+            serialized_scene += "\t[\"{}\"] = {{\n".format(room.name)   # export room
+            for variant in room.variants:
                 # create state script if it doesnt exist
                 try:
-                    if not state_script_exists(node.name):
-                        create_state_script(node.name)
+                    if not room_script_exists(room.name, variant.name):
+                        create_room_script(room.name, variant.name)
                 except Exception as err:
                     print(err)
                     raise
-                    
+                
                 # export state node
-                serialized_scene += "\t[\"{}\"] = {{\n".format(node.name)
-                serialized_scene += "\t\t{} = Engine.require(\"states/{}.lua\"),\n".format("script", node.name)
+                serialized_scene += "\t\t[\"{}\"] = {{\n".format(variant.name)
+                serialized_scene += "\t\t\t{} = Engine.require(\"{}\"),\n".format("script", room_scriptpath(room.name, variant.name))
                 
-                # find attached states
-                serialized_scene += "\t\t{} = {{\n".format("next_states")
-                for node_output in node.outputs:
-                    if node_output.links:
-                        connected_state = node_output.links[0].to_node
-                        serialized_scene += "\t\t\t[\"{}\"] = \"{}\",\n".format(node_output.name, connected_state.name)
-                serialized_scene += "\t\t},\n"
-                
-                serialized_scene += "\t\tobjects = {\n"  # object list
+                serialized_scene += "\t\t\tobjects = {\n"  # object list
 
-                obj_states = node.object_states
+                obj_states = variant.object_states
                 for obj_state in obj_states:
-                    serialized_scene += serialize_obj_state(obj_state, "\t\t\t") + ",\n"
+                    serialized_scene += serialize_obj_state(obj_state, "\t\t\t\t") + ",\n"
                 
-                serialized_scene += "\t\t}\n\t},\n"  # end object list
+                serialized_scene += "\t\t\t}\n\t\t},\n"  # end object list + end variant
+            serialized_scene += "\t},\n" # end room
 
-            serialized_scene += "}\n" # end state list
-            f.write(serialized_scene)
+        serialized_scene += "}\n" # end room list
+        f.write(serialized_scene)
 
 
 def export_component_include_file(output_filepath):
     with open(bpy.path.abspath(output_filepath), 'w') as f:
-        components = ecs.get_component_system().get_all_component_filepaths()
+        components = ecs.get_component_system().get_all_component_assetpaths()
         for c in components:
-            f.write('Component["{}"] = Engine.require("components/{}.lua")\n'.format(c, c))
+            f.write('Component["{}"] = Engine.require("{}")\n'.format(c, asset_scriptpath(c)))
 
 class export_scene_states_operator(bpy.types.Operator):
     bl_idname = "smithy2d.export_scene_states"

@@ -117,9 +117,9 @@ def parse_script_inputs(abs_filepath):
 
 # -------------------------------------------------------
 class Component:
-    def __init__(self, filepath):
-        self.filepath = filepath
-        self.filewatcher = FileWatcher(abs_component_scriptpath(filepath))
+    def __init__(self, assetpath):
+        self.assetpath = assetpath
+        self.filewatcher = FileWatcher(asset_abspath(assetpath))
         self.inputs = {}
         self.err_log = ""
         self.inputs_changed = False
@@ -128,20 +128,24 @@ class Component:
         return self.filewatcher.look()
 
 _components = {}
-def get_or_create_component(filepath):
-    return _components.setdefault(filepath, Component(filepath))
+def get_or_create_component(assetpath):
+    return _components.setdefault(assetpath, Component(assetpath))
 
-def get_component(filepath):
-    return _components.get(filepath)
+def get_component(assetpath):
+    return _components.get(assetpath)
 
-def get_all_component_filepaths():
+def get_all_component_assetpaths():
     return list(_components)
 
 def recompile_component_if_changed(component):
     has_changed = component.check_file_change()
     if has_changed:
         # parse script inputs
-        inputs, err_log = parse_script_inputs(abs_component_scriptpath(component.filepath))
+        err_log = ""
+        inputs = []
+        filepath = asset_abspath(component.assetpath)
+        if os.path.exists(filepath):
+            inputs, err_log = parse_script_inputs(filepath)
         component.inputs = inputs
         component.err_log = err_log
         component.inputs_changed = True
@@ -170,15 +174,24 @@ def set_bpy_inputs(bpy_component, parsed_inputs):
 
 
 def refresh_inputs(bpy_component_instance):
-    component = get_or_create_component(bpy_component_instance.filepath)
-    recompile_component_if_changed(component)
+    scene = bpy.context.scene
+    room = scene.smithy2d.get_active_room()
+    c_assetpath = bpy_component_instance.get_assetpath(scene, room)
+    if c_assetpath:
+        component = get_or_create_component(c_assetpath)
+        recompile_component_if_changed(component)
 
-    bpy_component_instance.err_log = component.err_log
-    bpy_component_instance.file_exists = component.filewatcher.file_exists
-    set_bpy_inputs(bpy_component_instance, component.inputs)
+        bpy_component_instance.err_log = component.err_log
+        bpy_component_instance.file_exists = component.filewatcher.file_exists
+        set_bpy_inputs(bpy_component_instance, component.inputs)
+    else:
+        bpy_component_instance.file_exists = False
+        set_bpy_inputs(bpy_component_instance, [])
 
     from . import on_component_updated
     on_component_updated(bpy_component_instance.id_data, bpy_component_instance)
+    refresh_screen_area("PROPERTIES")
+
 
 def input_updated(bpy_component_instance, bpy_input):
     from . import on_component_updated
@@ -188,17 +201,20 @@ def input_updated(bpy_component_instance, bpy_input):
 def _frame_change_post(scene):
     # collect used scripts
     used_component_scripts = {} 
+    room = scene.smithy2d.get_active_room()
+
     for obj in bpy.data.objects:
         for c in obj.smithy2d.components:
-            if c.filepath != "":
-                script_path = c.filepath
-                instances_using_script = used_component_scripts.get(script_path, set())
-                instances_using_script.add(c)
-                used_component_scripts[script_path] = instances_using_script
+            if c.name != "":
+                c_assetpath = c.get_assetpath(scene, room)
+                if c_assetpath:
+                    instances_using_script = used_component_scripts.get(c_assetpath, set())
+                    instances_using_script.add(c)
+                    used_component_scripts[c_assetpath] = instances_using_script
 
     # reparse any scripts that were modified
-    for filepath, instances in used_component_scripts.items():
-        component = get_or_create_component(filepath)
+    for c_assetpath, instances in used_component_scripts.items():
+        component = get_or_create_component(c_assetpath)
         recompile_component_if_changed(component)
         
         # set inputs for component instances
@@ -208,5 +224,6 @@ def _frame_change_post(scene):
                 bpy_component_instance.file_exists = component.filewatcher.file_exists
                 set_bpy_inputs(bpy_component_instance, component.inputs)
         component.inputs_changed = False
+    pass
 
 

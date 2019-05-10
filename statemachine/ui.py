@@ -40,7 +40,7 @@ class Smithy2D_SM_PT_SceneStateNodePanel(bpy.types.Panel):
         node = node_group.nodes.active
 
         layout.prop(node, "lex_name", text="Name")
-        layout.operator('smithy2d.edit_selected_state_script', text="Edit Script")
+        layout.operator('smithy2d.edit_selected_room_script', text="Edit Script")
 
 
 # hide the standard node prop panel if it's a smithy stategraph

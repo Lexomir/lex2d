@@ -4,22 +4,23 @@ from . import ecs
 
 
 class Smithy2D_Object(bpy.types.PropertyGroup):
-    def get_component(self, filepath):
+    def get_component(self, name):
         for c in self.components:
-            if c.filepath == filepath:
+            if c.name == name:
                 return c
     
-    def add_component(self, filepath):
-        c = self.get_component(filepath)
+    def add_component(self, name, is_global=False):
+        c = self.get_component(name)
         if not c:
             c = self.components.add()
-            c.filepath = filepath
+            c.set_name(name)
+            c.set_is_global(is_global)
             self.get_component_system().refresh_inputs(c)
         return c
 
-    def remove_component(self, filepath):
+    def remove_component(self, name):
         for i, c in enumerate(reversed(self.components)):
-            if c.filepath == filepath:
+            if c.name == name:
                 self.components.remove(i)
 
     def get_components(self):
@@ -31,8 +32,36 @@ class Smithy2D_Object(bpy.types.PropertyGroup):
     active_component_index : bpy.props.IntProperty(default=-1)
     components : bpy.props.CollectionProperty(type=ecs.properties.Smithy2D_Component)
 
+class Smithy2D_Image(bpy.types.PropertyGroup):
+    is_map : bpy.props.BoolProperty(default=False)
+
 class Smithy2D_Scene(bpy.types.PropertyGroup):
-    statemachine_name : bpy.props.StringProperty()
+    def set_room_and_update(self, index):
+        scene = self.id_data
+        old_index = self.active_room_index
+        if old_index >= 0:
+            old_room = self.rooms[old_index]
+            old_variant = old_room.get_active_variant()
+            if old_variant:
+                old_variant.save_scene_state(scene)
+        if index >= 0:
+            room = self.rooms[index]
+            variant = room.get_active_variant()
+            if variant:
+                variant.load_scene_state(scene)
+
+        self['active_room_index'] = index
+
+    def set_room(self, index):
+        self['active_room_index'] = index
+
+    def get_room(self):
+        return self.get('active_room_index', -1)
+
+    def get_active_room(self):
+        if self.active_room_index >= 0 and self.rooms:
+            return self.rooms[self.active_room_index]
+        return None
 
     def get_statemachine(self):
         return statemachine.get_statemachine(self.get_statemachine_name())
@@ -44,10 +73,16 @@ class Smithy2D_Scene(bpy.types.PropertyGroup):
         else:
             return self.statemachine_name
 
+    statemachine_name : bpy.props.StringProperty()
+    rooms : bpy.props.CollectionProperty(type=ecs.properties.Smithy2D_Room)
+    active_room_index : bpy.props.IntProperty(default=-1, get=get_room, set=set_room_and_update)
+
 def register():
     bpy.types.Object.smithy2d = bpy.props.PointerProperty(type=Smithy2D_Object)
     bpy.types.Scene.smithy2d = bpy.props.PointerProperty(type=Smithy2D_Scene)
+    bpy.types.Image.smithy2d = bpy.props.PointerProperty(type=Smithy2D_Image)
 
 def unregister():
     del bpy.types.Object.smithy2d
     del bpy.types.Scene.smithy2d
+    del bpy.types.Image.smithy2d

@@ -3,7 +3,7 @@ import subprocess
 import sys
 import os
 from . import uibase
-from .utils import abs_component_scriptpath
+from .utils import *
 
 class Smithy2D_ComponentListAction(bpy.types.Operator, uibase.LexBaseListAction):
     bl_idname = "lexlistaction.smithy2d_component_list_action"
@@ -24,7 +24,9 @@ class Smithy2D_ComponentListAction(bpy.types.Operator, uibase.LexBaseListAction)
 
 class Smithy2D_ComponentUIList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.prop(item, "filepath", text="", emboss=False)
+        row = layout.row()
+        row.prop(item, "name", text="", emboss=False)
+        row.prop(item, "is_global", text="", emboss=True)
 
     def invoke(self, context, event):
         i = "sup"
@@ -43,11 +45,11 @@ class Smithy2D_ScenePanel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        state_nodegroup = context.scene.smithy2d.get_statemachine()
-        state = state_nodegroup.find_applied_state_node() if state_nodegroup else None
-        if state:
-            layout.label(text="State: " + state.lex_name)
-            layout.operator('smithy2d.edit_applied_smithy_state_script', text="Edit Script")
+        room = context.scene.smithy2d.get_active_room()
+        variant = room.get_active_variant() if room else None
+        if room and variant:
+            layout.label(text="{} ({})".format(room.name, variant.name))
+            layout.operator('smithy2d.edit_selected_room_script', text="Edit Script")
         else:
             layout.label(text="State: [None]")
 
@@ -98,6 +100,9 @@ class Smithy2D_GameObjectPanel(bpy.types.Panel):
                 file_action_row = component_layout.row(align=True).split(factor=.25)
                 file_action_row.operator("smithy2d.open_component_script_external", text="Open")
             else:
+                if not context.scene.smithy2d.get_active_room() and not c.is_global:
+                    component_layout.label(text="Non-global components need a room")
+
                 file_action_row = component_layout.row(align=True).split(factor=.3)
                 file_action_row.operator("smithy2d.new_component_script", icon="ADD", text="Create")
 
@@ -121,7 +126,7 @@ class Smithy2D_OpenComponentScriptExternal(bpy.types.Operator):
         c = None
         if 0 <= c_index < len(context.object.smithy2d.components):
             c = context.object.smithy2d.components[c_index]
-        return context.object and c and c.filepath != ""
+        return context.object and c and c.name != ""
 
     def execute(self, context):
         if not bpy.data.filepath:
@@ -131,7 +136,11 @@ class Smithy2D_OpenComponentScriptExternal(bpy.types.Operator):
         c_index = context.object.smithy2d.active_component_index
         c = context.object.smithy2d.components[c_index]
         
-        script_filepath = abs_component_scriptpath(c.filepath)
+        room = context.scene.smithy2d.get_active_room()
+        if not room and not c.is_global:
+            return {"FINISHED"}
+
+        script_filepath = asset_abspath(c.get_assetpath(context.scene, room))
         subprocess.run(['code', os.path.dirname(script_filepath), script_filepath], shell=True)
 
         return {"FINISHED"}
@@ -148,19 +157,20 @@ class Smithy2D_NewComponentScript(bpy.types.Operator):
         c_index = context.object.smithy2d.active_component_index
         if 0 <= c_index < len(context.object.smithy2d.components):
             c = context.object.smithy2d.components[c_index]
-        return context.object and c and c.filepath != ""
+        return context.object and c and c.name != "" and (context.scene.smithy2d.get_active_room() or c.is_global)
 
     def execute(self, context):
         if not bpy.data.filepath:
             self.report({"ERROR"}, "Save the project first. This operation needs a project folder.")
             return {"CANCELLED"}
             
-        def create_component_script(script_name):
-            template_filepath = os.path.abspath(os.path.dirname(__file__) + "/templates/smithy_component_template.txt")
+        def create_component_script(bpy_component):
+            template_filepath = os.path.abspath(os.path.dirname(__file__) + "/ecs/templates/smithy_component_template.txt")
             with open(template_filepath, "r") as template_file:
                 component_template = template_file.read()
+            
+            output_filepath = asset_abspath(bpy_component.get_assetpath(context.scene, context.scene.smithy2d.get_active_room()))
 
-            output_filepath = abs_component_scriptpath(script_name)
             os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
             print("making", output_filepath)
 
@@ -174,7 +184,7 @@ class Smithy2D_NewComponentScript(bpy.types.Operator):
         c_index = context.object.smithy2d.active_component_index
         if c_index >= 0:
             c = context.object.smithy2d.components[c_index]
-            create_component_script(c.get_filepath())
+            create_component_script(c)
             c.refresh()
             bpy.ops.smithy2d.open_component_script_external()
         return {"FINISHED"}

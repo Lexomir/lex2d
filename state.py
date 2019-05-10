@@ -9,7 +9,7 @@ import os
 
 
 def _obj_component_updated(obj, smithy_component_instance):
-    if smithy_component_instance.filepath == "Render2D":
+    if smithy_component_instance.name == "Render2D" and smithy_component_instance.is_global:
         rel_img_filepath = smithy_component_instance.get_input('asset')
         if rel_img_filepath:
             abs_img_filepath = os.path.join(get_image_dir(), rel_img_filepath)
@@ -27,6 +27,8 @@ def _obj_component_updated(obj, smithy_component_instance):
                     apply_bmesh_to_object(obj, bm)
                     bm.free()
                     break
+        else:
+            clear_material_image(obj)
     
 
 
