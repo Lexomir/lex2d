@@ -76,8 +76,9 @@ def export_scene_states(scene, output_filepath):
             variant.save_scene_state(scene)
     with open(bpy.path.abspath(output_filepath), 'w') as f:
         serialized_scene = "return {\n"
+        serialized_scene += "\t[\"{}\"] = {{\n".format(scene.name)   # export dungeon
         for room in scene.smithy2d.rooms:
-            serialized_scene += "\t[\"{}\"] = {{\n".format(room.name)   # export room
+            serialized_scene += "\t\t[\"{}\"] = {{\n".format(room.name)   # export room
             for variant in room.variants:
                 # create state script if it doesnt exist
                 try:
@@ -88,19 +89,20 @@ def export_scene_states(scene, output_filepath):
                     raise
                 
                 # export state node
-                serialized_scene += "\t\t[\"{}\"] = {{\n".format(variant.name)
-                serialized_scene += "\t\t\t{} = Engine.require(\"{}\"),\n".format("script", room_scriptpath(room.name, variant.name))
+                serialized_scene += "\t\t\t[\"{}\"] = {{\n".format(variant.name)
+                serialized_scene += "\t\t\t\t{} = Engine.require(\"{}\"),\n".format("script", room_scriptpath(room.name, variant.name))
                 
-                serialized_scene += "\t\t\tobjects = {\n"  # object list
+                serialized_scene += "\t\t\t\tobjects = {\n"  # object list
 
                 obj_states = variant.object_states
                 for obj_state in obj_states:
-                    serialized_scene += serialize_obj_state(obj_state, "\t\t\t\t") + ",\n"
+                    serialized_scene += serialize_obj_state(obj_state, "\t\t\t\t\t") + ",\n"
                 
-                serialized_scene += "\t\t\t}\n\t\t},\n"  # end object list + end variant
-            serialized_scene += "\t},\n" # end room
+                serialized_scene += "\t\t\t\t}\n\t\t\t},\n"  # end object list + end variant
+            serialized_scene += "\t\t},\n" # end room
 
-        serialized_scene += "}\n" # end room list
+        serialized_scene += "\t}\n" # end room list
+        serialized_scene += "}\n" # end dungeon list
         f.write(serialized_scene)
 
 
