@@ -211,26 +211,26 @@ def register():
     bpy.app.handlers.load_post.append(_on_blendfile_load)
 
     
-    wm = bpy.context.window_manager
+    # wm = bpy.context.window_manager
     # km = wm.keyconfigs.addon.keymaps.new(
     #     name="Image", space_type='IMAGE_EDITOR', region_type='WINDOW')
-    wm.keyconfigs.active.keymaps['Image'].keymap_items.new(
-        'smithy2d.scale_room',
-        value='PRESS',
-        type='S',
-        ctrl=False,
-        alt=False,
-        shift=False,
-        oskey=False)
+    # wm.keyconfigs.active.keymaps['Image'].keymap_items.new(
+    #     'smithy2d.scale_room',
+    #     value='PRESS',
+    #     type='S',
+    #     ctrl=False,
+    #     alt=False,
+    #     shift=False,
+    #     oskey=False)
 
-    wm.keyconfigs.active.keymaps['Image'].keymap_items.new(
-        'smithy2d.grab_room',
-        value='PRESS',
-        type='G',
-        ctrl=False,
-        alt=False,
-        shift=False,
-        oskey=False)
+    # wm.keyconfigs.active.keymaps['Image'].keymap_items.new(
+    #     'smithy2d.grab_room',
+    #     value='PRESS',
+    #     type='G',
+    #     ctrl=False,
+    #     alt=False,
+    #     shift=False,
+    #     oskey=False)
 
 def unregister():
     if _room_draw_handle:

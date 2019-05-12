@@ -321,8 +321,6 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
         switch_state((old_variant.id_data, old_variant.get_room(), old_variant),
                      (variant.id_data, variant.get_room(), variant))
 
-        refresh_screen_area("PROPERTIES")
-
 
     location : bpy.props.FloatVectorProperty(size=2)
     size : bpy.props.FloatVectorProperty(size=2)

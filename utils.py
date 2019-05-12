@@ -46,6 +46,10 @@ def switch_state(old_state, new_state):
         if variant:
             room.set_variant(variant.index())
             variant.load_scene_state(scene)
+    
+    refresh_screen_area("PROPERTIES")
+    refresh_screen_area("IMAGE_EDITOR")
+
 
 def set_active_material_output(my_node):
     nodes = my_node.id_data.nodes
