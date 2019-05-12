@@ -316,11 +316,14 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
         scene = self.id_data
         old_index = self.active_variant_index
         old_variant = self.variants[old_index] if old_index >= 0 and old_index != index else None
+        old_scene = old_variant.id_data if old_variant else None
+        old_room = old_variant.get_room() if old_variant else None
         variant = self.variants[index] if index >= 0 else None
-        
-        switch_state((old_variant.id_data, old_variant.get_room(), old_variant),
-                     (variant.id_data, variant.get_room(), variant))
+        scene = variant.id_data if variant else None
+        room = variant.get_room() if variant else None
 
+        switch_state((old_scene, old_room, old_variant),
+                     (scene, room, variant))
 
     location : bpy.props.FloatVectorProperty(size=2)
     size : bpy.props.FloatVectorProperty(size=2)
