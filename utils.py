@@ -276,6 +276,20 @@ def global_component_assetpath(component_name):
 def component_assetpath(component_name, scene_name, room_name):
     return "scripts/{}/{}/components/{}.lua".format(scene_name, room_name, component_name)
 
+def get_component_from_asset(assetpath):
+    asset_parts = assetpath.split("/")
+    if asset_parts[1] == 'core':
+        return 'core', None, os.path.splitext(asset_parts[-1])[0]
+    else:
+        return asset_parts[1], asset_parts[2], os.path.splitext(asset_parts[4])[0]
+
+def component_idpath(assetpath):
+    scene, room, component = get_component_from_asset(assetpath)
+    if scene == 'core':
+        return "{}/{}".format(scene, component)
+    else:
+        return "{}/{}/{}".format(scene, room, component)
+
 def room_script_assetpath(scene_name, room_name, variant_name):
     return "scripts/{}/{}/states/{}.lua".format(scene_name, room_name, variant_name)
 

@@ -29,7 +29,7 @@ def serialize_obj_state(obj_state, line_prefix):
     serialized_state += "{}\tcomponents = {{\n".format(line_prefix)
     
     # transform component
-    serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, global_component_assetpath("Transform"))
+    serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, component_idpath(global_component_assetpath("Transform")))
 
     obj_size = obj_state.dimensions if is_renderable(obj_state) else obj_state.scale
     transform_inputs = [
@@ -45,7 +45,7 @@ def serialize_obj_state(obj_state, line_prefix):
     for sc in obj_state.components_serialized:
         if sc.name:
             scene = obj_state.id_data
-            serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, sc.get_assetpath(scene, obj_state.get_variant().get_room()))
+            serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, component_idpath(sc.get_assetpath(scene, obj_state.get_variant().get_room())))
             
             component = ecs.component_system.get_or_create_component(sc.get_assetpath(scene, obj_state.get_variant().get_room()))
             ecs.component_system.recompile_component_if_changed(component)
@@ -110,7 +110,7 @@ def export_component_include_file(output_filepath):
     with open(bpy.path.abspath(output_filepath), 'w') as f:
         components = ecs.get_component_system().get_all_component_assetpaths()
         for c in components:
-            f.write('Component["{}"] = Engine.require("{}")\n'.format(c, asset_scriptpath(c)))
+            f.write('Component["{}"] = Engine.require("{}")\n'.format(component_idpath(c), asset_scriptpath(c)))
 
 class export_scene_states_operator(bpy.types.Operator):
     bl_idname = "smithy2d.export_scene_states"
