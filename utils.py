@@ -30,6 +30,22 @@ def move_merge_folders(root_src_dir, root_dst_dir):
 def remove_dir(target_dir):
     os.system('rmdir /S /Q "{}"'.format(target_dir))
 
+def switch_state(old_state, new_state):
+    old_scene, old_room, old_variant = old_state
+    scene, room, variant = new_state
+    def name(item):
+        return item.name if item else "_"
+    print("Switching from {}:{}:{} to {}:{}:{}".format(
+        name(old_scene), name(old_room), name(old_variant), 
+        name(scene), name(room), name(variant)))
+    if old_variant:
+        old_variant.save_scene_state(old_scene)
+    
+    if room:
+        scene.smithy2d.set_room(room.index())
+        if variant:
+            room.set_variant(variant.index())
+            variant.load_scene_state(scene)
 
 def set_active_material_output(my_node):
     nodes = my_node.id_data.nodes

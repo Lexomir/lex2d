@@ -102,7 +102,8 @@ class Smithy2D_GameObjectPanel(bpy.types.Panel):
             else:
                 if not context.scene.smithy2d.get_active_room() and not c.is_global:
                     component_layout.label(text="Non-global components need a room")
-
+                room = context.scene.smithy2d.get_active_room()
+                variant = room.get_active_variant() if room else None
                 file_action_row = component_layout.row(align=True).split(factor=.3)
                 file_action_row.operator("smithy2d.new_component_script", icon="ADD", text="Create")
 

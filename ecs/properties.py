@@ -95,7 +95,7 @@ class Smithy2D_SerializedComponent(bpy.types.PropertyGroup):
         
         c = bpy_component_instance
         c.set_name(self.name)
-        c.is_global = self.is_global
+        c.set_is_global(self.is_global)
         c.inputs.clear()
         for input_str in input_strs:
             name, datatype, str_value = input_str.split(",", 2)
@@ -206,6 +206,12 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
             final_name = name + "_" + str(i)
         
         return final_name
+    
+    def index(self):
+        room = self.get_room()
+        for i, v in enumerate(room.variants):
+            if v == self:
+                return i
 
     def set_name_and_update(self, val):
         old_name = self.get('name', self.name)
@@ -276,6 +282,12 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
         if bpy.data.filepath and name != old_name:
             _rename_room_directory(self, old_name, name)
 
+    def index(self):
+        scene = self.id_data
+        for i, r in enumerate(scene.smithy2d.rooms):
+            if r == self:
+                return i
+
     def set_name(self, val):
         name = self.get_unique_name(val)
         self['name'] = name
@@ -303,15 +315,11 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
         print('Setting Room "{}" to variant {}'.format(self.get_name(), index))
         scene = self.id_data
         old_index = self.active_variant_index
-        if old_index >= 0 and old_index != index:
-            old_variant = self.variants[old_index]
-            old_variant.save_scene_state(scene)
-            
-        if index >= 0:
-            variant = self.variants[index]
-            variant.load_scene_state(scene)
-            
-        self['active_variant_index'] = index
+        old_variant = self.variants[old_index] if old_index >= 0 and old_index != index else None
+        variant = self.variants[index] if index >= 0 else None
+        
+        switch_state((old_variant.id_data, old_variant.get_room(), old_variant),
+                     (variant.id_data, variant.get_room(), variant))
 
         refresh_screen_area("PROPERTIES")
 

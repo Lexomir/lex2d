@@ -108,7 +108,7 @@ class Smithy2D_RoomSelector(bpy.types.Operator):
                 for i, room in enumerate(bpy.context.scene.smithy2d.rooms):
                     if room.contains(_mouse_view_location):
                         bpy.context.scene.smithy2d.active_room_index = i
-                        break
+                        return {'RUNNING_MODAL'}
 
         return {'PASS_THROUGH'}
  
@@ -212,8 +212,8 @@ def register():
 
     
     wm = bpy.context.window_manager
-    km = wm.keyconfigs.addon.keymaps.new(
-        name="Image", space_type='IMAGE_EDITOR', region_type='WINDOW')
+    # km = wm.keyconfigs.addon.keymaps.new(
+    #     name="Image", space_type='IMAGE_EDITOR', region_type='WINDOW')
     wm.keyconfigs.active.keymaps['Image'].keymap_items.new(
         'smithy2d.scale_room',
         value='PRESS',

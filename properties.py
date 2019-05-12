@@ -1,6 +1,7 @@
 import bpy
 from . import statemachine
 from . import ecs
+from .utils import *
 
 
 class Smithy2D_Object(bpy.types.PropertyGroup):
@@ -39,17 +40,12 @@ class Smithy2D_Scene(bpy.types.PropertyGroup):
     def set_room_and_update(self, index):
         scene = self.id_data
         old_index = self.active_room_index
-        if old_index >= 0:
-            old_room = self.rooms[old_index]
-            old_variant = old_room.get_active_variant()
-            if old_variant:
-                old_variant.save_scene_state(scene)
-        if index >= 0:
-            room = self.rooms[index]
-            variant = room.get_active_variant()
-            if variant:
-                variant.load_scene_state(scene)
-
+        old_room = self.rooms[old_index] if old_index >= 0 else None
+        old_variant = old_room.get_active_variant() if old_room else None
+        room = self.rooms[index] if index >= 0 else None
+        variant = room.get_active_variant() if room else None
+        switch_state((scene, old_room, old_variant), (scene, room, variant))
+        
         self['active_room_index'] = index
 
     def set_room(self, index):
