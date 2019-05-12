@@ -185,10 +185,11 @@ def replace_components(component_context, state_components):
 
 def _rename_room_script(variant, old_name, name):
     # rename variant script file
-    old_script_assetpath = room_script_assetpath(variant.get_room().name, old_name)
+    scene = variant.id_data
+    old_script_assetpath = room_script_assetpath(scene.name, variant.get_room().name, old_name)
     old_script_filepath = asset_abspath(old_script_assetpath)
     if os.path.exists(old_script_filepath):
-        new_script_assetpath = room_script_assetpath(variant.get_room().name, name)
+        new_script_assetpath = room_script_assetpath(scene.name, variant.get_room().name, name)
         new_script_filepath = asset_abspath(new_script_assetpath)
 
         if os.path.exists(new_script_filepath):
@@ -231,7 +232,7 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
     def save_scene_state(self, scene):
         self.object_states.clear()
 
-        objs = bpy.data.objects
+        objs = scene.objects
         for o in objs:
             state = self.object_states.add()
             state.name = o.name
@@ -239,8 +240,8 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
     
     def load_scene_state(self, scene):
         for state in self.object_states:
-            obj = bpy.data.objects.get(state.name, None)
-            if obj:
+            obj = bpy.data.objects.get(state.name)
+            if obj and obj.name in scene.objects:
                 state.load(obj)
 
     name : bpy.props.StringProperty(set=set_name_and_update, get=get_name)
@@ -299,7 +300,7 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
         return self.get('active_variant_index', -1)
 
     def set_variant_and_update(self, index):
-        print('Setting Room "{}" to variant "{}"'.format(self.get_name(), index))
+        print('Setting Room "{}" to variant {}'.format(self.get_name(), index))
         scene = self.id_data
         old_index = self.active_variant_index
         if old_index >= 0 and old_index != index:

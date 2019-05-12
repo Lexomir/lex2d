@@ -1,4 +1,5 @@
 import bpy
+from ..utils import * 
 from .. import uibase
 
 
@@ -26,6 +27,9 @@ class Smithy2D_ME_RoomListAction(bpy.types.Operator, uibase.LexBaseListAction):
         item.set_name("Room")
         item.variants.add().set_name("Variant")
         item.set_variant(0)
+        item.size = (.2, .2)
+        item.location = (.4, .4)
+        refresh_screen_area("IMAGE_EDITOR")
 
 class Smithy2D_ME_RoomVariantListAction(bpy.types.Operator, uibase.LexBaseListAction):
     bl_idname = "lexlistaction.smithy2d_roomvariant_list_action"
@@ -147,3 +151,6 @@ class Smithy2D_ME_PT_SceneRoomVariants(bpy.types.Panel):
             draw_list_action("lexlistaction.smithy2d_roomvariant_list_action", list_action_col, 'UP', 'TRIA_UP')
             draw_list_action("lexlistaction.smithy2d_roomvariant_list_action", list_action_col, 'DOWN', 'TRIA_DOWN')
 
+        if room.variants:
+            layout.operator('smithy2d.edit_selected_room_script', text="Edit Script")
+        layout.separator()

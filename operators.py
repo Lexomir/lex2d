@@ -119,15 +119,15 @@ class Smithy2D_EditSelectedRoomScript(bpy.types.Operator):
             return {"CANCELLED"}
         
         # get state name, find lua file
+        scene = room.id_data
         variant = room.get_active_variant()
-        if not room_script_exists(room.name, variant.name):
-            create_room_script(room.name, variant.name)
+        if not room_script_exists(scene.name, room.name, variant.name):
+            create_room_script(scene.name, room.name, variant.name)
 
-        script_filepath = asset_abspath(room_script_assetpath(room.name, variant.name))
+        script_filepath = asset_abspath(room_script_assetpath(scene.name, room.name, variant.name))
         subprocess.run(['code', os.path.dirname(script_filepath), script_filepath], shell=True)
 
         return {"FINISHED"}
-
 
 
 def draw_item(self, context):
@@ -136,7 +136,6 @@ def draw_item(self, context):
 
 def register():
     bpy.types.VIEW3D_MT_mesh_add.prepend(draw_item)
-
 
 def unregister():
     bpy.types.VIEW3D_MT_mesh_add.remove(draw_item)

@@ -5,6 +5,7 @@ import os
 import gpu
 import bgl
 from gpu_extras.batch import batch_for_shader
+from ..utils import *
 
 
 class Smithy2D_DrawNewRoom(bpy.types.Operator):
@@ -111,6 +112,95 @@ class Smithy2D_RoomSelector(bpy.types.Operator):
 
         return {'PASS_THROUGH'}
  
+
+
+
+class Smithy2D_GrabRoom(bpy.types.Operator):
+    bl_idname = 'smithy2d.grab_room'
+    bl_label = "Smithy2D Grab/Move Room in map editor"
+
+    start_mousepos : bpy.props.FloatVectorProperty(size=2)
+    start_roompos : bpy.props.FloatVectorProperty(size=2)
+
+    @classmethod
+    def poll(cls, context):
+        area = context.area
+        return (area.type == "IMAGE_EDITOR" 
+            and area.spaces.active.image
+            and area.spaces.active.image.smithy2d.is_map
+            and context.scene.smithy2d.get_active_room())
+    
+    def invoke(self, context, event):
+        room = context.scene.smithy2d.get_active_room()
+        self.start_mousepos = context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y)
+        self.start_roompos = (room.location[0], room.location[1])
+        context.window_manager.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+    
+    def modal(self, context, event):
+        room = context.scene.smithy2d.get_active_room()
+        if event.type == 'MOUSEMOVE':
+            move_ratio = 1
+            mousepos = context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y)
+            mouse_delta = (mousepos[0] - self.start_mousepos[0], mousepos[1] - self.start_mousepos[1])
+            room.location = (self.start_roompos[0] + mouse_delta[0]*move_ratio, self.start_roompos[1] + mouse_delta[1]*move_ratio)
+            refresh_screen_area("IMAGE_EDITOR")
+        elif event.type == 'LEFTMOUSE' and event.value == 'PRESS':
+            return {'FINISHED'}
+        elif event.type == 'RIGHTMOUSE' and event.value == 'PRESS':
+            room.location = (self.start_roompos[0], self.start_roompos[1])
+            refresh_screen_area("IMAGE_EDITOR")
+            return {'CANCELLED'}
+
+        return {'RUNNING_MODAL'}
+
+class Smithy2D_ScaleRoom(bpy.types.Operator):
+    bl_idname = 'smithy2d.scale_room'
+    bl_label = "Smithy2D Scale Room in map editor"
+
+    start_roompos : bpy.props.FloatVectorProperty(size=2)
+    start_roomscale : bpy.props.FloatVectorProperty(size=2)
+    start_mousepos : bpy.props.FloatVectorProperty(size=2)
+
+    @classmethod
+    def poll(cls, context):
+        area = context.area
+        return (area.type == "IMAGE_EDITOR" 
+            and area.spaces.active.image
+            and area.spaces.active.image.smithy2d.is_map
+            and context.scene.smithy2d.get_active_room())
+    
+    def invoke(self, context, event):
+        room = context.scene.smithy2d.get_active_room()
+        self.start_roompos = (room.location[0], room.location[1])
+        self.start_roomscale = (room.size[0], room.size[1])
+        self.start_mousepos = context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y)
+        context.window_manager.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+    
+    def modal(self, context, event):
+        room = context.scene.smithy2d.get_active_room()
+        if event.type == 'MOUSEMOVE':
+            half_roomscale = (room.size[0] * .5, room.size[1] * .5)
+            roomcenter = (room.location[0] + half_roomscale[0], room.location[1] + half_roomscale[1])
+            move_ratio = 1
+            mousepos = context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y)
+            mouse_offset = (mousepos[0] - self.start_mousepos[0], mousepos[1] - self.start_mousepos[1])
+            room.size = (self.start_roomscale[0] + mouse_offset[0]*move_ratio, self.start_roomscale[1] + mouse_offset[1]*move_ratio)
+            room.location = (roomcenter[0] - room.size[0]*.5, roomcenter[1] - room.size[1]*.5)
+            refresh_screen_area("IMAGE_EDITOR")
+        elif event.type == 'LEFTMOUSE' and event.value == 'PRESS':
+            return {'FINISHED'}
+        elif event.type == 'RIGHTMOUSE' and event.value == 'PRESS':
+            room.location = (self.start_roompos[0], self.start_roompos[1])
+            room.size = (self.start_roomscale[0], self.start_roomscale[1])
+            refresh_screen_area("IMAGE_EDITOR")
+            return {'CANCELLED'}
+
+        return {'RUNNING_MODAL'}
+
+
+
 @persistent
 def _on_blendfile_load(dummy):
     bpy.ops.smithy2d.select_room('INVOKE_DEFAULT')
@@ -119,6 +209,28 @@ def register():
     global _room_draw_handle 
     _room_draw_handle = bpy.types.SpaceImageEditor.draw_handler_add(draw_rooms, (), 'WINDOW', 'POST_VIEW')
     bpy.app.handlers.load_post.append(_on_blendfile_load)
+
+    
+    wm = bpy.context.window_manager
+    km = wm.keyconfigs.addon.keymaps.new(
+        name="Image", space_type='IMAGE_EDITOR', region_type='WINDOW')
+    wm.keyconfigs.active.keymaps['Image'].keymap_items.new(
+        'smithy2d.scale_room',
+        value='PRESS',
+        type='S',
+        ctrl=False,
+        alt=False,
+        shift=False,
+        oskey=False)
+
+    wm.keyconfigs.active.keymaps['Image'].keymap_items.new(
+        'smithy2d.grab_room',
+        value='PRESS',
+        type='G',
+        ctrl=False,
+        alt=False,
+        shift=False,
+        oskey=False)
 
 def unregister():
     if _room_draw_handle:

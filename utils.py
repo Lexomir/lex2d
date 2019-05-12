@@ -222,16 +222,16 @@ def vec3_approx_equals(vec, other, ep=.001):
 def is_renderable(obj_state):
     return not vec3_approx_equals(obj_state.dimensions, (0, 0, 0))
 
-def room_script_exists(room_name, variant_name):
-    script_filepath = asset_abspath(room_script_assetpath(room_name, variant_name))
+def room_script_exists(scene_name, room_name, variant_name):
+    script_filepath = asset_abspath(room_script_assetpath(scene_name, room_name, variant_name))
     return os.path.exists(script_filepath)
 
-def create_room_script(room_name, variant_name):
+def create_room_script(scene_name, room_name, variant_name):
     template_filepath = os.path.normpath(os.path.abspath(os.path.dirname(__file__) + "/ecs/templates/smithy_state_script_template.txt"))
     with open(template_filepath, "r") as template_file:
         script_template = template_file.read()
 
-    output_filepath = asset_abspath(room_script_assetpath(room_name, variant_name))
+    output_filepath = asset_abspath(room_script_assetpath(scene_name, room_name, variant_name))
     os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
     print("Making State Script: ", output_filepath)
 
@@ -254,10 +254,10 @@ def global_component_assetpath(component_name):
     return "scripts/core/components/{}.lua".format(component_name)
 
 def component_assetpath(component_name, scene_name, room_name):
-    return "scripts/{}/components/{}.lua".format(room_name, component_name)
+    return "scripts/{}/{}/components/{}.lua".format(scene_name, room_name, component_name)
 
-def room_script_assetpath(room_name, variant_name):
-    return "scripts/{}/states/{}.lua".format(room_name, variant_name)
+def room_script_assetpath(scene_name, room_name, variant_name):
+    return "scripts/{}/{}/states/{}.lua".format(scene_name, room_name, variant_name)
 
 def asset_scriptpath(assetpath):
     return os.path.relpath(assetpath, start="scripts") 
@@ -265,5 +265,5 @@ def asset_scriptpath(assetpath):
 def room_dir_assetpath(room_name):
     return "scripts/{}".format(room_name)
 
-def room_scriptpath(room_name, variant_name):
-    return asset_scriptpath(room_script_assetpath(room_name, variant_name))
+def room_scriptpath(scene_name, room_name, variant_name):
+    return asset_scriptpath(room_script_assetpath(scene_name, room_name, variant_name))

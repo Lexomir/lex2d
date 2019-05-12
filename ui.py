@@ -172,7 +172,7 @@ class Smithy2D_NewComponentScript(bpy.types.Operator):
             output_filepath = asset_abspath(bpy_component.get_assetpath(context.scene, context.scene.smithy2d.get_active_room()))
 
             os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
-            print("making", output_filepath)
+            print("Making component: ", output_filepath)
 
             with open(output_filepath, "w") as script_file:
                 component_name = bpy_component.name

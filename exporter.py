@@ -68,40 +68,40 @@ def serialize_obj_state(obj_state, line_prefix):
     return serialized_state
 
 
-def export_scene_states(scene, output_filepath):
-    room = scene.smithy2d.get_active_room()
-    if room:
-        variant = room.get_active_variant()
-        if variant: 
-            variant.save_scene_state(scene)
+def export_scene_states(output_filepath):
+
     with open(bpy.path.abspath(output_filepath), 'w') as f:
         serialized_scene = "return {\n"
-        serialized_scene += "\t[\"{}\"] = {{\n".format(scene.name)   # export dungeon
-        for room in scene.smithy2d.rooms:
-            serialized_scene += "\t\t[\"{}\"] = {{\n".format(room.name)   # export room
-            for variant in room.variants:
-                # create state script if it doesnt exist
-                try:
-                    if not room_script_exists(room.name, variant.name):
-                        create_room_script(room.name, variant.name)
-                except Exception as err:
-                    print(err)
-                    raise
-                
-                # export state node
-                serialized_scene += "\t\t\t[\"{}\"] = {{\n".format(variant.name)
-                serialized_scene += "\t\t\t\t{} = Engine.require(\"{}\"),\n".format("script", room_scriptpath(room.name, variant.name))
-                
-                serialized_scene += "\t\t\t\tobjects = {\n"  # object list
 
-                obj_states = variant.object_states
-                for obj_state in obj_states:
-                    serialized_scene += serialize_obj_state(obj_state, "\t\t\t\t\t") + ",\n"
-                
-                serialized_scene += "\t\t\t\t}\n\t\t\t},\n"  # end object list + end variant
-            serialized_scene += "\t\t},\n" # end room
+        for scene in bpy.data.scenes:
+            print("Exporting scene '{}'".format(scene.name))
 
-        serialized_scene += "\t}\n" # end room list
+            serialized_scene += "\t[\"{}\"] = {{\n".format(scene.name)   # export dungeon
+            for room in scene.smithy2d.rooms:
+                serialized_scene += "\t\t[\"{}\"] = {{\n".format(room.name)   # export room
+                for variant in room.variants:
+                    # create state script if it doesnt exist
+                    try:
+                        if not room_script_exists(scene.name, room.name, variant.name):
+                            create_room_script(scene.name, room.name, variant.name)
+                    except Exception as err:
+                        print(err)
+                        raise
+                    
+                    # export state node
+                    serialized_scene += "\t\t\t[\"{}\"] = {{\n".format(variant.name)
+                    serialized_scene += "\t\t\t\t{} = Engine.require(\"{}\"),\n".format("script", room_scriptpath(scene.name, room.name, variant.name))
+                    
+                    serialized_scene += "\t\t\t\tobjects = {\n"  # object list
+
+                    obj_states = variant.object_states
+                    for obj_state in obj_states:
+                        serialized_scene += serialize_obj_state(obj_state, "\t\t\t\t\t") + ",\n"
+                    
+                    serialized_scene += "\t\t\t\t}\n\t\t\t},\n"  # end object list + end variant
+                serialized_scene += "\t\t},\n" # end room
+
+            serialized_scene += "\t}\n" # end dungeon
         serialized_scene += "}\n" # end dungeon list
         f.write(serialized_scene)
 
@@ -119,8 +119,17 @@ class export_scene_states_operator(bpy.types.Operator):
     def execute(self, context):
         scene_states_filepath = "{}/assets/scripts/scene_states.lua".format(get_asset_dir())
         component_includes_filepath = "{}/assets/scripts/blend_includes.lua".format(get_asset_dir())
+
+        # save the current state
+        room = context.scene.smithy2d.get_active_room()
+        if room:
+            variant = room.get_active_variant()
+            if variant: 
+                variant.save_scene_state(context.scene)
+
+        # try exporting all scenes     
         try:
-            export_scene_states(context.scene, scene_states_filepath)
+            export_scene_states(scene_states_filepath)
             export_component_include_file(component_includes_filepath)
         except Exception as err:
             print(err)
