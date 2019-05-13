@@ -174,9 +174,7 @@ def set_bpy_inputs(bpy_component, parsed_inputs):
         bpy_input.set_generic(i_datatype, i_value, i_args)
 
 
-def refresh_inputs(bpy_component_instance):
-    scene = bpy.context.scene
-    room = scene.smithy2d.get_active_room()
+def refresh_inputs(scene, room, bpy_component_instance):
     c_assetpath = bpy_component_instance.get_assetpath(scene, room)
     if c_assetpath:
         component = get_or_create_component(c_assetpath)

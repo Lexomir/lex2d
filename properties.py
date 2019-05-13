@@ -16,7 +16,7 @@ class Smithy2D_Object(bpy.types.PropertyGroup):
             c = self.components.add()
             c.set_name(name)
             c.set_is_global(is_global)
-            self.get_component_system().refresh_inputs(c)
+            self.get_component_system().refresh_inputs(bpy.context.scene, bpy.context.scene.smithy2d.get_active_room(), c)
         return c
 
     def remove_component(self, name):

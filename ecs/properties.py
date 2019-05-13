@@ -16,7 +16,7 @@ class Smithy2D_Component(bpy.types.PropertyGroup):
     def set_name_and_update(self, name):
         from . import component_system
         self['name'] = name
-        component_system.refresh_inputs(self)
+        component_system.refresh_inputs(bpy.context.scene, bpy.context.scene.smithy2d.get_active_room(), self)
             # TODO compute inputs
 
     def get_assetpath(self, scene, room):
@@ -52,7 +52,7 @@ class Smithy2D_Component(bpy.types.PropertyGroup):
     def set_is_global_and_update(self, is_global):
         self['is_global'] = is_global
         from . import component_system
-        component_system.refresh_inputs(self)
+        component_system.refresh_inputs(bpy.context.scene, bpy.context.scene.smithy2d.get_active_room(), self)
 
     def get_is_global(self):
         return self.get('is_global', False)
@@ -128,8 +128,13 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
 
     # load state into the given object
     def load(self, obj):
-        replace_components(obj.smithy2d, self.components_serialized)
-
+        scene = self.id_data
+        room = self.get_variant().get_room()
+        replace_components(obj.smithy2d, scene, room, self.components_serialized)
+        component_system = obj.smithy2d.get_component_system()
+        for bpy_c in obj.smithy2d.components:
+            component_system.refresh_inputs(scene, room, bpy_c)
+            
         obj.location = self.location
         obj.rotation_quaternion = self.rotation_quaternion
         obj.scale = self.scale
@@ -154,7 +159,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
     dimensions : bpy.props.FloatVectorProperty(size=3)
     rotation_quaternion : bpy.props.FloatVectorProperty(size=4)
 
-def replace_components(component_context, state_components):
+def replace_components(component_context, scene, room, state_components):
     def component_list_intersection(a_list, b_list):
             intersecting = []
             a_list = list(a_list)
@@ -172,16 +177,13 @@ def replace_components(component_context, state_components):
     dying_components, continuing_components, new_components = component_list_intersection(bpy_components, state_components)
     for dying_c in dying_components:
         component_context.remove_component(dying_c.name)
-        component_list_intersection(bpy_components, state_components)
     
     component_system = component_context.get_component_system()
     for (bpy_c, state_c) in continuing_components:
         state_c.deserialize(bpy_c)
-        component_system.refresh_inputs(bpy_c)
     for new_sc in new_components:
         bpy_c = component_context.add_component(new_sc.name)
         new_sc.deserialize(bpy_c)
-        component_system.refresh_inputs(bpy_c)
 
 def _rename_room_script(variant, old_name, name):
     # rename variant script file

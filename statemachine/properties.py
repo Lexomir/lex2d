@@ -58,7 +58,8 @@ class Smithy2D_SM_ObjectState(bpy.types.PropertyGroup):
     
     # load state into the given object
     def load(self, obj):
-        replace_components(obj.smithy2d, self.components_serialized)
+        scene = self.id_data
+        replace_components(obj.smithy2d, scene, self.components_serialized)
 
         obj.location = self.location
         obj.rotation_quaternion = self.rotation_quaternion
@@ -90,7 +91,7 @@ class Smithy2D_SM_ObjectState(bpy.types.PropertyGroup):
     rotation_quaternion : bpy.props.FloatVectorProperty(size=4)
 
 
-def replace_components(component_context, state_components):
+def replace_components(component_context, scene, room, state_components):
     def component_list_intersection(a_list, b_list):
             intersecting = []
             a_list = list(a_list)
@@ -113,8 +114,8 @@ def replace_components(component_context, state_components):
     component_system = component_context.get_component_system()
     for (bpy_c, state_c) in continuing_components:
         state_c.deserialize(bpy_c)
-        component_system.refresh_inputs(bpy_c)
+        component_system.refresh_inputs(scene, room, bpy_c)
     for new_sc in new_components:
         bpy_c = component_context.add_component(new_sc.filepath)
         new_sc.deserialize(bpy_c)
-        component_system.refresh_inputs(bpy_c)
+        component_system.refresh_inputs(scene, room, bpy_c)

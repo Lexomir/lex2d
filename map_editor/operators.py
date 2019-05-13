@@ -8,29 +8,6 @@ from gpu_extras.batch import batch_for_shader
 from ..utils import *
 
 
-class Smithy2D_DrawNewRoom(bpy.types.Operator):
-    bl_idname = "smithy2d.draw_new_room"
-    bl_label = "Smithy2D: Draw New Room"
-
-    room_index : bpy.props.IntProperty(default=0)
-    start_pos : bpy.props.FloatVectorProperty(size=2)
-
-    @classmethod
-    def poll(cls, context):
-        return context.space_data.type == "IMAGE_EDITOR"
-    
-    def execute(self, context):
-        context.window_manager.modal_handler_add(self)
-        context.scene.smithy2d.rooms.add()
-        self.room_index = len(context.scene.smithy2d.rooms) - 1
-
-        return {'RUNNING_MODAL'}
-    
-    def modal(self, context, event):
-        print("IN THE MODAL")
-        return {'FINISHED'}
-
-
 vertices = (
     (0, 1), # tl
     (0, 0), # bl
@@ -76,6 +53,28 @@ def draw_rooms():
             room_batch.draw(room_shader)
 
 
+class Smithy2D_DrawNewRoom(bpy.types.Operator):
+    bl_idname = "smithy2d.draw_new_room"
+    bl_label = "Smithy2D: Draw New Room"
+
+    room_index : bpy.props.IntProperty(default=0)
+    start_pos : bpy.props.FloatVectorProperty(size=2)
+
+    @classmethod
+    def poll(cls, context):
+        return context.space_data.type == "IMAGE_EDITOR"
+    
+    def execute(self, context):
+        context.window_manager.modal_handler_add(self)
+        context.scene.smithy2d.rooms.add()
+        self.room_index = len(context.scene.smithy2d.rooms) - 1
+
+        return {'RUNNING_MODAL'}
+    
+    def modal(self, context, event):
+        print("IN THE MODAL")
+        return {'FINISHED'}
+
 class Smithy2D_RoomSelector(bpy.types.Operator):
     bl_idname = "smithy2d.select_room"
     bl_label = "Smithy2D: Begin room selector"
@@ -112,9 +111,6 @@ class Smithy2D_RoomSelector(bpy.types.Operator):
 
         return {'PASS_THROUGH'}
  
-
-
-
 class Smithy2D_GrabRoom(bpy.types.Operator):
     bl_idname = 'smithy2d.grab_room'
     bl_label = "Smithy2D Grab/Move Room in map editor"
@@ -198,7 +194,6 @@ class Smithy2D_ScaleRoom(bpy.types.Operator):
             return {'CANCELLED'}
 
         return {'RUNNING_MODAL'}
-
 
 
 @persistent

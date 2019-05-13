@@ -186,6 +186,6 @@ class Smithy2D_NewComponentScript(bpy.types.Operator):
         if c_index >= 0:
             c = context.object.smithy2d.components[c_index]
             create_component_script(c)
-            ecs.get_component_system().refresh_inputs(c)
+            ecs.get_component_system().refresh_inputs(context.scene, context.scene.get_active_room(), c)
             bpy.ops.smithy2d.open_component_script_external()
         return {"FINISHED"}

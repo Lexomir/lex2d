@@ -268,7 +268,7 @@ def get_asset_dir():
     return "//gamedata/"
 
 def asset_abspath(assetpath):
-    return bpy.path.abspath("//") + "gamedata/assets/{}".format(assetpath)
+    return "{}gamedata/assets/{}".format(bpy.path.abspath("//").replace('\\', '/'), assetpath)
 
 def global_component_assetpath(component_name):
     return "scripts/core/components/{}.lua".format(component_name)
@@ -294,7 +294,7 @@ def room_script_assetpath(scene_name, room_name, variant_name):
     return "scripts/{}/{}/states/{}.lua".format(scene_name, room_name, variant_name)
 
 def asset_scriptpath(assetpath):
-    return os.path.relpath(assetpath, start="scripts") 
+    return os.path.relpath(assetpath, start="scripts").replace('\\', '/')
 
 def room_dir_assetpath(room_name):
     return "scripts/{}".format(room_name)
