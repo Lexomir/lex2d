@@ -20,7 +20,9 @@ class Smithy2D_Component(bpy.types.PropertyGroup):
             # TODO compute inputs
 
     def get_assetpath(self, scene, room):
-        if self.is_global:
+        if not self.name:
+            return None
+        elif self.is_global:
             return global_component_assetpath(self.name) if self.name else None
         else:
             return component_assetpath(self.name, scene.name, room.name) if room and scene else None

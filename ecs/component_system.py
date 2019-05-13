@@ -136,7 +136,7 @@ def get_component(assetpath):
     return _components.get(assetpath)
 
 def get_all_component_assetpaths():
-    return list(_components)
+    return [ap for ap in _components if _components[ap].filewatcher.file_exists]
 
 def recompile_component_if_changed(component):
     has_changed = component.check_file_change()

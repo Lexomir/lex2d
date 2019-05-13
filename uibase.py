@@ -50,7 +50,6 @@ class LexBaseListAction:
             collection.remove(idx)
         elif self.action == 'ADD':
             item = collection.add()
-            item.name = ""
             self.on_add(item)
             self.set_index(len(collection) - 1, propagate=True)
         return {"FINISHED"}
