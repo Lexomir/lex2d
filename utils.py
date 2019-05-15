@@ -36,6 +36,16 @@ def move_merge_folders(root_src_dir, root_dst_dir):
 def remove_dir(target_dir):
     os.system('rmdir /S /Q "{}"'.format(target_dir))
 
+def find_map_editor_areas():
+    map_editors = []
+    if bpy.context.screen:
+        for area in bpy.context.screen.areas:
+            if (area.type == "IMAGE_EDITOR" 
+                and area.spaces.active.image
+                and area.spaces.active.image.smithy2d.is_map):
+                map_editors.append(area)
+    return map_editors
+
 def switch_state(old_state, new_state):
     old_scene, old_room, old_variant = old_state
     scene, room, variant = new_state
@@ -49,6 +59,16 @@ def switch_state(old_state, new_state):
     
     if scene and scene != bpy.context.window.scene:
         bpy.context.window.scene = scene
+
+        #TODO move this to scene.save_state/load_state
+        map_editors = find_map_editor_areas()
+        map_image = map_editors[0].spaces.active.image if map_editors else None
+        if map_image:
+            old_scene.smithy2d.map_image = map_image.name
+        new_map_image = scene.smithy2d.get_map_image()
+        if new_map_image:
+            for me in map_editors:
+                me.spaces.active.image = new_map_image
 
     if room:
         scene.smithy2d.set_room(room.index())

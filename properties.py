@@ -111,10 +111,14 @@ class Smithy2D_Scene(bpy.types.PropertyGroup):
         else:
             return self.statemachine_name
 
+    def get_map_image(self):
+        return bpy.data.images.get(self.map_image)
+
     name : bpy.props.StringProperty(set=set_name_and_update, get=get_name)
     statemachine_name : bpy.props.StringProperty()
     rooms : bpy.props.CollectionProperty(type=ecs.properties.Smithy2D_Room)
     active_room_index : bpy.props.IntProperty(default=-1, get=get_room, set=set_room_and_update)
+    map_image : bpy.props.StringProperty()
 
 def _scene_changed(old_scene, new_scene):
         old_room = old_scene.smithy2d.get_active_room() if old_scene else None
@@ -203,7 +207,7 @@ def register():
     bpy.types.WindowManager.smithy2d = bpy.props.PointerProperty(type=Smithy2D_WindowManager)
 
 def unregister():
-    if bpy.app.times.is_registered(HACK_sanity_check):
+    if bpy.app.timers.is_registered(HACK_sanity_check):
         bpy.app.timers.unregister(HACK_sanity_check)
 
     del bpy.types.Object.smithy2d

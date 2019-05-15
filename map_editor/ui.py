@@ -138,7 +138,7 @@ class Smithy2D_ME_PT_Scenes(bpy.types.Panel):
         if len(smithy_wm.scenes) > 1:
             draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'UP', 'TRIA_UP')
             draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'DOWN', 'TRIA_DOWN')
-
+        
 
 class Smithy2D_ME_PT_SceneRooms(bpy.types.Panel):
     bl_space_type = 'IMAGE_EDITOR'
