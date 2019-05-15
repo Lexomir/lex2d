@@ -16,7 +16,8 @@ class Smithy2D_Component(bpy.types.PropertyGroup):
     def set_name_and_update(self, name):
         from . import component_system
         self['name'] = name
-        component_system.refresh_inputs(bpy.context.scene, bpy.context.scene.smithy2d.get_active_room(), self)
+        scene = bpy.context.scene.smithy2d.get_active_scene()
+        component_system.refresh_inputs(scene, scene.get_active_room(), self)
             # TODO compute inputs
 
     def get_assetpath(self, scene, room):
@@ -54,7 +55,8 @@ class Smithy2D_Component(bpy.types.PropertyGroup):
     def set_is_global_and_update(self, is_global):
         self['is_global'] = is_global
         from . import component_system
-        component_system.refresh_inputs(bpy.context.scene, bpy.context.scene.smithy2d.get_active_room(), self)
+        scene = bpy.context.scene.smithy2d.get_active_scene()
+        component_system.refresh_inputs(scene, scene.get_active_room(), self)
 
     def get_is_global(self):
         return self.get('is_global', False)
@@ -111,8 +113,8 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
         return self.name
 
     def get_variant(self):
-        scene = self.id_data
-        room = scene.path_resolve(".".join(self.path_from_id().split('.')[0:-1]))
+        bpy_scene = self.id_data
+        room = bpy_scene.path_resolve(".".join(self.path_from_id().split('.')[0:-1]))
         return room
 
     # save object state
@@ -130,8 +132,8 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
 
     # load state into the given object
     def load(self, obj):
-        scene = self.id_data
         room = self.get_variant().get_room()
+        scene = room.get_scene()
         component_system = obj.smithy2d.get_component_system()
         obj.smithy2d.components.clear()
         for new_sc in self.components_serialized:
@@ -166,7 +168,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
 def _rename_room_script(variant, old_name, name):
     print("Renaming roomscript  '{}' to '{}'".format(old_name, name))
     # rename variant script file
-    scene = variant.id_data
+    scene = variant.get_room().get_scene()
     old_script_assetpath = room_script_assetpath(scene.name, variant.get_room().name, old_name)
     old_script_filepath = asset_abspath(old_script_assetpath)
     if os.path.exists(old_script_filepath):
@@ -212,23 +214,23 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
         return self.get('name', "")
 
     def get_room(self):
-        scene = self.id_data
-        room = scene.path_resolve(".".join(self.path_from_id().split('.')[0:-1]))
+        bpy_scene = self.id_data
+        room = bpy_scene.path_resolve(".".join(self.path_from_id().split('.')[0:-1]))
         return room
 
-    def save_scene_state(self, scene):
+    def save_scene_state(self, bpy_scene):
         self.object_states.clear()
 
-        objs = scene.objects
+        objs = bpy_scene.objects
         for o in objs:
             state = self.object_states.add()
             state.name = o.name
             state.save(o)
     
-    def load_scene_state(self, scene):
+    def load_scene_state(self, bpy_scene):
         for state in self.object_states:
             obj = bpy.data.objects.get(state.name)
-            if obj and obj.name in scene.objects:
+            if obj and obj.name in bpy_scene.objects:
                 state.load(obj)
 
     name : bpy.props.StringProperty(set=set_name_and_update, get=get_name)
@@ -245,11 +247,19 @@ def _rename_room_directory(room, scene_name, old_name, name):
         move_merge_folders(old_room_dir_abspath, new_room_dir_abspath)
 
 class Smithy2D_Room(bpy.types.PropertyGroup):
+    def init(self, name):
+        self.set_name(name)
+        self.variants.add().set_name('Variant')
+        self.set_variant(0)
+        self.size = (.2, .2)
+        self.location = (.4, .4)
+        return self
+
     def get_unique_name(self, name):
-        scene = self.id_data
+        scene = self.get_scene()
         final_name = name
         i = 0
-        while scene.smithy2d.rooms.get(final_name) and final_name != self.name:
+        while scene.rooms.get(final_name) and final_name != self.name:
             i += 1
             final_name = name + "_" + str(i)
         
@@ -261,13 +271,13 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
         self['name'] = name
         refresh_screen_area("PROPERTIES")
         
-        scene = self.id_data
+        scene = self.get_scene()
         if bpy.data.filepath and name != old_name:
             _rename_room_directory(self, scene.name, old_name, name)
 
     def index(self):
-        scene = self.id_data
-        for i, r in enumerate(scene.smithy2d.rooms):
+        scene = self.get_scene()
+        for i, r in enumerate(scene.rooms):
             if r == self:
                 return i
 
@@ -278,6 +288,11 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
 
     def get_name(self):
         return self.get('name', "")
+
+    def get_scene(self):
+        bpy_scene = self.id_data
+        scene = bpy_scene.path_resolve(".".join(self.path_from_id().split('.')[0:-1]))
+        return scene
 
     def contains(self, point):
         return (point[0] >= self.location[0] and point[0] <= (self.location[0] + self.size[0]) 
@@ -295,14 +310,13 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
         return self.get('active_variant_index', -1)
 
     def set_variant_and_update(self, index):
-        scene = self.id_data
         old_index = self.active_variant_index
         old_variant = self.variants[old_index] if old_index >= 0 and old_index != index else None
-        old_scene = old_variant.id_data if old_variant else None
+        old_scene = old_variant.get_room().get_scene() if old_variant else None
         old_room = old_variant.get_room() if old_variant else None
         variant = self.variants[index] if index >= 0 else None
-        scene = variant.id_data if variant else None
         room = variant.get_room() if variant else None
+        scene = room.get_scene() if room else None
 
         switch_state((old_scene, old_room, old_variant),
                      (scene, room, variant))

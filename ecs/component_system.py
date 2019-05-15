@@ -184,38 +184,38 @@ def refresh_inputs(scene, room, bpy_component_instance):
 
 def input_updated(bpy_component_instance, bpy_input):
     from . import on_component_updated
-    on_component_updated(bpy.context.scene, bpy_component_instance.id_data, bpy_component_instance)
+    on_component_updated(bpy.context.scene.smithy2d.get_active_scene(), bpy_component_instance.id_data, bpy_component_instance)
 
 @persistent
 def check_file_changes():
-    scene = bpy.context.scene
+    scene = bpy.context.scene.smithy2d.get_active_scene()
+    if scene:
+        # collect used scripts
+        used_component_scripts = {} 
+        room = scene.get_active_room()
 
-    # collect used scripts
-    used_component_scripts = {} 
-    room = scene.smithy2d.get_active_room()
+        for obj in bpy.data.objects:
+            for c in obj.smithy2d.components:
+                if c.name != "":
+                    c_assetpath = c.get_assetpath(scene, room)
+                    if c_assetpath:
+                        instances_using_script = used_component_scripts.get(c_assetpath, set())
+                        instances_using_script.add(c)
+                        used_component_scripts[c_assetpath] = instances_using_script
 
-    for obj in bpy.data.objects:
-        for c in obj.smithy2d.components:
-            if c.name != "":
-                c_assetpath = c.get_assetpath(scene, room)
-                if c_assetpath:
-                    instances_using_script = used_component_scripts.get(c_assetpath, set())
-                    instances_using_script.add(c)
-                    used_component_scripts[c_assetpath] = instances_using_script
-
-    # reparse any scripts that were modified
-    for c_assetpath, instances in used_component_scripts.items():
-        component = get_or_create_component(c_assetpath)
-        recompile_component_if_changed(component)
-        
-        # set inputs for component instances
-        if component.inputs_changed:
-            for bpy_component_instance in instances:
-                bpy_component_instance.err_log = component.err_log
-                bpy_component_instance.file_exists = component.filewatcher.file_exists
-                set_bpy_inputs(bpy_component_instance, component.inputs)
-            refresh_screen_area("PROPERTIES")
-        component.inputs_changed = False
+        # reparse any scripts that were modified
+        for c_assetpath, instances in used_component_scripts.items():
+            component = get_or_create_component(c_assetpath)
+            recompile_component_if_changed(component)
+            
+            # set inputs for component instances
+            if component.inputs_changed:
+                for bpy_component_instance in instances:
+                    bpy_component_instance.err_log = component.err_log
+                    bpy_component_instance.file_exists = component.filewatcher.file_exists
+                    set_bpy_inputs(bpy_component_instance, component.inputs)
+                refresh_screen_area("PROPERTIES")
+            component.inputs_changed = False
     
     return 1.5   # repeat every x seconds 
 

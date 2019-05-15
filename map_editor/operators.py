@@ -46,10 +46,11 @@ def draw_rooms():
         room_shader.uniform_float("MousePos", _mouse_view_location)
         bgl.glEnable(bgl.GL_BLEND)
         bgl.glBlendFunc(bgl.GL_SRC_ALPHA, bgl.GL_ONE_MINUS_SRC_ALPHA)
-        for i, room in enumerate(bpy.context.scene.smithy2d.rooms):
+        scene = bpy.context.scene.smithy2d.get_active_scene()
+        for i, room in enumerate(scene.rooms):
             room_shader.uniform_float("RoomPosition", (room.location[0], room.location[1]))
             room_shader.uniform_float("RoomSize", (room.size[0], room.size[1]))
-            room_shader.uniform_int("IsSelected", int(i == bpy.context.scene.smithy2d.active_room_index))
+            room_shader.uniform_int("IsSelected", int(i == scene.active_room_index))
             room_batch.draw(room_shader)
 
 
@@ -66,8 +67,9 @@ class Smithy2D_DrawNewRoom(bpy.types.Operator):
     
     def execute(self, context):
         context.window_manager.modal_handler_add(self)
-        context.scene.smithy2d.rooms.add()
-        self.room_index = len(context.scene.smithy2d.rooms) - 1
+        scene = context.scene.smithy2d.get_active_scene()
+        scene.rooms.add()
+        self.room_index = len(scene.rooms) - 1
 
         return {'RUNNING_MODAL'}
     
@@ -88,6 +90,7 @@ class Smithy2D_RoomSelector(bpy.types.Operator):
         return {'RUNNING_MODAL'}
     
     def modal(self, context, event):
+        scene = bpy.context.scene.smithy2d.get_active_scene()
         global _mouse_view_location
         global _editor_area
         if event.type == 'MOUSEMOVE':
@@ -104,9 +107,9 @@ class Smithy2D_RoomSelector(bpy.types.Operator):
                 area.tag_redraw()
         if event.type == 'RIGHTMOUSE' and event.value == "PRESS":
             if _editor_area:
-                for i, room in enumerate(bpy.context.scene.smithy2d.rooms):
+                for i, room in enumerate(scene.rooms):
                     if room.contains(_mouse_view_location):
-                        bpy.context.scene.smithy2d.active_room_index = i
+                        scene.active_room_index = i
                         return {'RUNNING_MODAL'}
 
         return {'PASS_THROUGH'}
@@ -124,17 +127,20 @@ class Smithy2D_GrabRoom(bpy.types.Operator):
         return (area.type == "IMAGE_EDITOR" 
             and area.spaces.active.image
             and area.spaces.active.image.smithy2d.is_map
-            and context.scene.smithy2d.get_active_room())
+            and context.scene.smithy2d.get_active_scene()
+            and context.scene.smithy2d.get_active_scene().get_active_room())
     
     def invoke(self, context, event):
-        room = context.scene.smithy2d.get_active_room()
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room()
         self.start_mousepos = context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y)
         self.start_roompos = (room.location[0], room.location[1])
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
     
     def modal(self, context, event):
-        room = context.scene.smithy2d.get_active_room()
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room()
         if event.type == 'MOUSEMOVE':
             move_ratio = 1
             mousepos = context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y)
@@ -164,10 +170,12 @@ class Smithy2D_ScaleRoom(bpy.types.Operator):
         return (area.type == "IMAGE_EDITOR" 
             and area.spaces.active.image
             and area.spaces.active.image.smithy2d.is_map
-            and context.scene.smithy2d.get_active_room())
+            and context.scene.smithy2d.get_active_scene()
+            and context.scene.smithy2d.get_active_scene().get_active_room())
     
     def invoke(self, context, event):
-        room = context.scene.smithy2d.get_active_room()
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room()
         self.start_roompos = (room.location[0], room.location[1])
         self.start_roomscale = (room.size[0], room.size[1])
         self.start_mousepos = context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y)
@@ -175,7 +183,8 @@ class Smithy2D_ScaleRoom(bpy.types.Operator):
         return {'RUNNING_MODAL'}
     
     def modal(self, context, event):
-        room = context.scene.smithy2d.get_active_room()
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room()
         if event.type == 'MOUSEMOVE':
             half_roomscale = (room.size[0] * .5, room.size[1] * .5)
             roomcenter = (room.location[0] + half_roomscale[0], room.location[1] + half_roomscale[1])

@@ -9,13 +9,13 @@ class Smithy2D_ME_RoomListAction(bpy.types.Operator, uibase.LexBaseListAction):
     bl_label = "Smithy2D Room List Action"
 
     def get_collection(self):
-        return bpy.context.scene.smithy2d.rooms
+        return bpy.context.scene.smithy2d.get_active_scene().rooms
 
     def get_index_property(self):
         return "active_room_index"
 
     def get_index_source(self):
-        return bpy.context.scene.smithy2d
+        return bpy.context.scene.smithy2d.get_active_scene()
     
     def set_index(self, index, propagate):
         smithy_scene = self.get_index_source()
@@ -37,7 +37,7 @@ class Smithy2D_ME_RoomVariantListAction(bpy.types.Operator, uibase.LexBaseListAc
     bl_label = "Smithy2D Room Variant List Action"
 
     def get_collection(self):
-        room = bpy.context.scene.smithy2d.rooms[bpy.context.scene.smithy2d.active_room_index]
+        room = bpy.context.scene.smithy2d.get_active_scene().get_active_room()
         return room.variants
 
     def get_index_property(self):
@@ -51,7 +51,7 @@ class Smithy2D_ME_RoomVariantListAction(bpy.types.Operator, uibase.LexBaseListAc
             variants.set_variant(index)
 
     def get_index_source(self):
-        room = bpy.context.scene.smithy2d.rooms[bpy.context.scene.smithy2d.active_room_index]
+        room = bpy.context.scene.smithy2d.get_active_scene().get_active_room()
         return room
 
     def on_add(self, item):
@@ -63,29 +63,19 @@ class Smithy2D_ME_SceneListAction(bpy.types.Operator, uibase.LexBaseListAction):
     bl_label = "Smithy2D Scene List Action"
 
     def get_collection(self):
-        return bpy.context.window_manager.smithy2d.scenes
+        return bpy.context.scene.smithy2d.scenes
 
     def get_index_property(self):
         return "active_scene_index"
 
     def get_index_source(self):
-        return bpy.context.window_manager.smithy2d
+        return bpy.context.scene.smithy2d
 
     def new_item(self):
-        item = bpy.context.window_manager.smithy2d.new_scene()
-        room = item.smithy2d.rooms.add()
-        room.size = (.2, .2)
-        room.location = (.4, .4)
-        room.set_name("Room")
-        item.smithy2d.set_room(0)
-        room.variants.add().set_name("Variant")
-        room.set_variant(0)
+        item = bpy.context.scene.smithy2d.scenes.add().init("Scene")
 
         refresh_screen_area("IMAGE_EDITOR")
         return item
-
-    def remove_item(self, index):
-        bpy.context.window_manager.smithy2d.remove_scene(index)
 
 
 class Smithy2D_RoomUIList(bpy.types.UIList):
@@ -99,11 +89,6 @@ class Smithy2D_RoomUIList(bpy.types.UIList):
 class Smithy2D_SceneUIList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         layout.prop(item, "name", text="", emboss=False)
-
-    def filter_items(self, context, data, propname):
-        indices = range(len(bpy.data.scenes))
-        flt_flags = [self.bitflag_filter_item] * len(bpy.data.scenes)
-        return flt_flags, indices
 
 
 class Smithy2D_ME_PT_Scenes(bpy.types.Panel):
@@ -124,12 +109,10 @@ class Smithy2D_ME_PT_Scenes(bpy.types.Panel):
             op = action_col.operator(list_idname, icon=icon, text="")
             op.action = action
 
-        smithy_wm = context.window_manager.smithy2d
-
         list_row = layout.row()
         list_row.template_list("Smithy2D_SceneUIList", "SmithyScenes",
-            smithy_wm, "scenes",
-            smithy_wm, "active_scene_index",
+            context.scene.smithy2d, "scenes",
+            context.scene.smithy2d, "active_scene_index",
             rows=3)
 
         list_action_col = list_row.column(align=True)
@@ -137,7 +120,7 @@ class Smithy2D_ME_PT_Scenes(bpy.types.Panel):
         draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'REMOVE', 'REMOVE')
         list_action_col.separator()
 
-        if len(smithy_wm.scenes) > 1:
+        if len(context.scene.smithy2d.scenes) > 1:
             draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'UP', 'TRIA_UP')
             draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'DOWN', 'TRIA_DOWN')
         
@@ -158,8 +141,7 @@ class Smithy2D_ME_PT_SceneRooms(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        scene = context.scene
-        smithy_scene = context.scene.smithy2d
+        smithy_scene = context.scene.smithy2d.get_active_scene()
 
         def draw_list_action(list_idname, action_col, action, icon):
             op = action_col.operator(list_idname, icon=icon, text="")
@@ -180,8 +162,8 @@ class Smithy2D_ME_PT_SceneRooms(bpy.types.Panel):
             draw_list_action("lexlistaction.smithy2d_room_list_action", list_action_col, 'UP', 'TRIA_UP')
             draw_list_action("lexlistaction.smithy2d_room_list_action", list_action_col, 'DOWN', 'TRIA_DOWN')
 
-        if smithy_scene.active_room_index >= 0:
-            room = smithy_scene.rooms[smithy_scene.active_room_index]
+        room = smithy_scene.get_active_room()
+        if room:
             layout.prop(room, "location", text="Position")
             layout.prop(room, "size", text="Size")
 
@@ -195,7 +177,7 @@ class Smithy2D_ME_PT_SceneRoomVariants(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        smithy_scene = context.scene.smithy2d
+        smithy_scene = context.scene.smithy2d.get_active_scene()
         return (context.space_data 
             and context.space_data.image
             and smithy_scene.active_room_index >= 0 
@@ -204,10 +186,9 @@ class Smithy2D_ME_PT_SceneRoomVariants(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        scene = context.scene
-        smithy_scene = context.scene.smithy2d
+        smithy_scene = context.scene.smithy2d.get_active_scene()
 
-        room = smithy_scene.rooms[smithy_scene.active_room_index]
+        room = smithy_scene.get_active_room()
 
         def draw_list_action(list_idname, action_col, action, icon):
             op = action_col.operator(list_idname, icon=icon, text="")
@@ -233,14 +214,9 @@ class Smithy2D_ME_PT_SceneRoomVariants(bpy.types.Panel):
         layout.separator()
 
 
-
-@persistent
-def _on_blendfile_load(dummy):
-    bpy.context.window_manager.smithy2d.ensure_scene_list()
-
 def register():
-    bpy.app.handlers.load_post.append(_on_blendfile_load)
+    pass
     
 def unregister():
-    bpy.app.handlers.load_post.remove(_on_blendfile_load)
+    pass
     

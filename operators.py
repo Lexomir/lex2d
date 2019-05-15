@@ -113,13 +113,13 @@ class Smithy2D_EditSelectedRoomScript(bpy.types.Operator):
             self.report({"ERROR"}, "Save the project first. This operation needs a project folder.")
             return {"CANCELLED"}
         
-        room = bpy.context.scene.smithy2d.get_active_room()
+        scene = bpy.context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room()
         if not room:
             self.report({"ERROR"}, "Create a room first. This operation needs a room folder.")
             return {"CANCELLED"}
         
         # get state name, find lua file
-        scene = room.id_data
         variant = room.get_active_variant()
         if not room_script_exists(scene.name, room.name, variant.name):
             create_room_script(scene.name, room.name, variant.name)

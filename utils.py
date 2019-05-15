@@ -51,30 +51,30 @@ def switch_state(old_state, new_state):
     scene, room, variant = new_state
     def name(item):
         return item.name if item else "_"
+
     print("Switching from {}:{}:{} to {}:{}:{}".format(
         name(old_scene), name(old_room), name(old_variant), 
         name(scene), name(room), name(variant)))
-    if old_variant:
-        old_variant.save_scene_state(old_scene)
-    
-    if scene and scene != bpy.context.window.scene:
-        bpy.context.window.scene = scene
 
+    if old_variant:
+        old_variant.save_scene_state(bpy.context.scene)
+    
+    if old_scene != scene:
         #TODO move this to scene.save_state/load_state
         map_editors = find_map_editor_areas()
         map_image = map_editors[0].spaces.active.image if map_editors else None
         if map_image:
-            old_scene.smithy2d.map_image = map_image.name
-        new_map_image = scene.smithy2d.get_map_image()
+            old_scene.map_image = map_image.name
+        new_map_image = scene.get_map_image()
         if new_map_image:
             for me in map_editors:
                 me.spaces.active.image = new_map_image
 
     if room:
-        scene.smithy2d.set_room(room.index())
+        scene.set_room(room.index())
         if variant:
             room.set_variant(variant.index())
-            variant.load_scene_state(scene)
+            variant.load_scene_state(bpy.context.scene)
     
     refresh_screen_area("PROPERTIES")
     refresh_screen_area("IMAGE_EDITOR")
