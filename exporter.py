@@ -101,7 +101,7 @@ def export_scene_states(output_filepath):
                     serialized_scene += "\t\t\t\t}\n\t\t\t},\n"  # end object list + end variant
                 serialized_scene += "\t\t},\n" # end room
 
-            serialized_scene += "\t}\n" # end dungeon
+            serialized_scene += "\t},\n" # end dungeon
         serialized_scene += "}\n" # end dungeon list
         f.write(serialized_scene)
 
