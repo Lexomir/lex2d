@@ -8,11 +8,12 @@ def register():
     lexsuite = sys.modules.get('lex_suite')
     globals()['FileWatcher'] = lexsuite.filewatcher.FileWatcher
 
-    bpy.app.handlers.frame_change_post.append(_frame_change_post)
+    #bpy.app.handlers.frame_change_post.append(_frame_change_post)
     
 
 def unregister():
-    bpy.app.handlers.frame_change_post.remove(_frame_change_post)
+    pass
+    #bpy.app.handlers.frame_change_post.remove(_frame_change_post)
 
 
 def parse_input(input_str):
@@ -188,13 +189,13 @@ def refresh_inputs(scene, room, bpy_component_instance):
         set_bpy_inputs(bpy_component_instance, [])
 
     from . import on_component_updated
-    on_component_updated(bpy_component_instance.id_data, bpy_component_instance)
+    on_component_updated(scene, bpy_component_instance.id_data, bpy_component_instance)
     refresh_screen_area("PROPERTIES")
 
 
 def input_updated(bpy_component_instance, bpy_input):
     from . import on_component_updated
-    on_component_updated(bpy_component_instance.id_data, bpy_component_instance)
+    on_component_updated(bpy.context.scene, bpy_component_instance.id_data, bpy_component_instance)
 
 @persistent
 def _frame_change_post(scene):

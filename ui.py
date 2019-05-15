@@ -28,9 +28,6 @@ class Smithy2D_ComponentUIList(bpy.types.UIList):
         row.prop(item, "name", text="", emboss=False)
         row.prop(item, "is_global", text="", emboss=True)
 
-    def invoke(self, context, event):
-        i = "sup"
-
 
 class Smithy2D_ScenePanel(bpy.types.Panel):
     bl_idname = "SCENE_PT_lex_game_scene_panel"
@@ -52,7 +49,6 @@ class Smithy2D_ScenePanel(bpy.types.Panel):
             layout.operator('smithy2d.edit_selected_room_script', text="Edit Script")
         else:
             layout.label(text="State: [None]")
-
 
 
 class Smithy2D_GameObjectPanel(bpy.types.Panel):

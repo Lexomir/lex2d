@@ -17,6 +17,18 @@ class LexBaseListAction:
 
     def get_index_source(self): return []
 
+    def move_item(self, old_index, new_index):
+        collection = self.get_collection()
+        collection.move(old_index, new_index)
+
+    def new_item(self):
+        collection = self.get_collection()
+        return collection.add()
+    
+    def remove_item(self, index):
+        collection = self.get_collection()
+        collection.remove(index)
+
     def on_add(self, added_item): pass
 
     def on_remove(self, removed_item): pass
@@ -27,29 +39,33 @@ class LexBaseListAction:
         index_property_name = self.get_index_property()
         setattr(index_src, index_property_name, index)
 
-
-    def execute(self, context):
+    def get_index(self):
         collection = self.get_collection()
         index_src = self.get_index_source()
         index_property_name = self.get_index_property()
-        idx = getattr(index_src, index_property_name)
+        return getattr(index_src, index_property_name)
 
+    def execute(self, context):
+        collection = self.get_collection()
+        idx = self.get_index()
+
+        # TODO get item function
         item = collection[idx] if 0 <= idx < len(collection) else None
 
         if self.action == 'DOWN' and idx < len(collection) - 1:
-            collection.move(idx, idx + 1)
+            self.move_item(idx, idx + 1)
             self.set_index(idx + 1, propagate=False)
         elif self.action == 'UP' and idx >= 1:
             item_prev = collection[idx - 1]
-            collection.move(idx, idx - 1)
+            self.move_item(idx, idx - 1)
             self.set_index(idx - 1, propagate=False)
         elif self.action == 'REMOVE' and item:
             if idx != 0 or len(collection) == 1:
                 self.set_index(idx - 1, propagate=True)
             self.on_remove(item)
-            collection.remove(idx)
+            self.remove_item(idx)
         elif self.action == 'ADD':
-            item = collection.add()
+            item = self.new_item()
             self.on_add(item)
             self.set_index(len(collection) - 1, propagate=True)
         return {"FINISHED"}

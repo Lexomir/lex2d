@@ -135,7 +135,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
         component_system = obj.smithy2d.get_component_system()
         obj.smithy2d.components.clear()
         for new_sc in self.components_serialized:
-            bpy_c = obj.smithy2d.add_component(new_sc.name, is_global=new_sc.is_global)
+            bpy_c = obj.smithy2d.add_component(new_sc.name, is_global=new_sc.is_global, calc_inputs=False)
             new_sc.deserialize(bpy_c)
             component_system.refresh_inputs(scene, room, bpy_c)
 
@@ -292,7 +292,6 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
         return self.get('active_variant_index', -1)
 
     def set_variant_and_update(self, index):
-        print('Setting Room "{}" to variant {}'.format(self.get_name(), index))
         scene = self.id_data
         old_index = self.active_variant_index
         old_variant = self.variants[old_index] if old_index >= 0 and old_index != index else None

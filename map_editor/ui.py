@@ -1,4 +1,5 @@
 import bpy
+from bpy.app.handlers import persistent
 from ..utils import * 
 from .. import uibase
 
@@ -57,12 +58,83 @@ class Smithy2D_ME_RoomVariantListAction(bpy.types.Operator, uibase.LexBaseListAc
         item.set_name("Variant")
 
 
+class Smithy2D_ME_SceneListAction(bpy.types.Operator, uibase.LexBaseListAction):
+    bl_idname = "lexlistaction.smithy2d_scene_list_action"
+    bl_label = "Smithy2D Scene List Action"
+
+    def get_collection(self):
+        return bpy.context.window_manager.smithy2d.scenes
+
+    def get_index_property(self):
+        return "active_scene_index"
+
+    def get_index_source(self):
+        return bpy.context.window_manager.smithy2d
+
+    def new_item(self):
+        item = bpy.context.window_manager.smithy2d.new_scene()
+        room = item.smithy2d.rooms.add()
+        room.set_name("Room")
+        item.smithy2d.set_room(0)
+        room.variants.add().set_name("Variant")
+        room.set_variant(0)
+
+        refresh_screen_area("IMAGE_EDITOR")
+        return item
+
+    def remove_item(self, index):
+        bpy.context.window_manager.smithy2d.remove_scene(index)
+
+
 class Smithy2D_RoomUIList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         layout.prop(item, "name", text="", emboss=False)
 
     def invoke(self, context, event):
         pass
+
+
+class Smithy2D_SceneUIList(bpy.types.UIList):
+    def filter_items(self, context, data, propname):
+        indices = range(len(bpy.data.scenes))
+        flt_flags = [self.bitflag_filter_item] * len(bpy.data.scenes)
+        return flt_flags, indices
+
+
+class Smithy2D_ME_PT_Scenes(bpy.types.Panel):
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = 'Map'
+    bl_options = {'DEFAULT_CLOSED'}
+    bl_label = "Scenes"
+    
+    @classmethod
+    def poll(cls, context):
+        return context.space_data and context.space_data.image
+
+    def draw(self, context):
+        layout = self.layout
+
+        def draw_list_action(list_idname, action_col, action, icon):
+            op = action_col.operator(list_idname, icon=icon, text="")
+            op.action = action
+
+        smithy_wm = context.window_manager.smithy2d
+
+        list_row = layout.row()
+        list_row.template_list("Smithy2D_SceneUIList", "SmithyScenes",
+            smithy_wm, "scenes",
+            smithy_wm, "active_scene_index",
+            rows=3)
+
+        list_action_col = list_row.column(align=True)
+        draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'ADD', 'ADD')
+        draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'REMOVE', 'REMOVE')
+        list_action_col.separator()
+
+        if len(smithy_wm.scenes) > 1:
+            draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'UP', 'TRIA_UP')
+            draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'DOWN', 'TRIA_DOWN')
 
 
 class Smithy2D_ME_PT_SceneRooms(bpy.types.Panel):
@@ -154,3 +226,16 @@ class Smithy2D_ME_PT_SceneRoomVariants(bpy.types.Panel):
         if room.variants:
             layout.operator('smithy2d.edit_selected_room_script', text="Edit Script")
         layout.separator()
+
+
+
+@persistent
+def _on_blendfile_load(dummy):
+    bpy.context.window_manager.smithy2d.ensure_scene_list()
+
+def register():
+    bpy.app.handlers.load_post.append(_on_blendfile_load)
+    
+def unregister():
+    bpy.app.handlers.load_post.remove(_on_blendfile_load)
+    

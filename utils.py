@@ -41,6 +41,9 @@ def switch_state(old_state, new_state):
     if old_variant:
         old_variant.save_scene_state(old_scene)
     
+    if scene != bpy.context.window.scene:
+        bpy.context.window.scene = scene
+
     if room:
         scene.smithy2d.set_room(room.index())
         if variant:
@@ -72,13 +75,13 @@ def find_texture_node_with_image(nodes, image):
             return node
 
 def apply_bmesh_to_object(obj, bm):
-    active_obj = bpy.context.view_layer.objects.active
-    bpy.context.view_layer.objects.active = obj
+    active_obj = bpy.context.window.view_layer.objects.active
+    bpy.context.window.view_layer.objects.active = obj
     mode = bpy.context.mode
     bpy.ops.object.mode_set(mode='OBJECT')
     bm.to_mesh(obj.data)
     bpy.ops.object.mode_set(mode=mode)
-    bpy.context.view_layer.objects.active = active_obj
+    bpy.context.window.view_layer.objects.active = active_obj
 
 def get_or_create_input_node(node_tree, src_node, input_node_type, from_output_name, to_input_name):
     connected_node = None

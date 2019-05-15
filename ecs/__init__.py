@@ -9,9 +9,9 @@ def get_component_system():
 
 _component_update_callbacks = []
 
-def on_component_updated(obj, component_instance):
+def on_component_updated(scene, obj, component_instance):
     for cb in _component_update_callbacks:
-        cb(obj, component_instance)
+        cb(scene, obj, component_instance)
 
 def add_component_updated_callback(func):
     _component_update_callbacks.append(func)
