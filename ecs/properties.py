@@ -310,16 +310,18 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
         return self.get('active_variant_index', -1)
 
     def set_variant_and_update(self, index):
-        old_index = self.active_variant_index
-        old_variant = self.variants[old_index] if old_index >= 0 and old_index != index else None
-        old_scene = old_variant.get_room().get_scene() if old_variant else None
-        old_room = old_variant.get_room() if old_variant else None
         variant = self.variants[index] if index >= 0 else None
-        room = variant.get_room() if variant else None
-        scene = room.get_scene() if room else None
+        if variant:
+            room = variant.get_room() if variant else None
+            scene = room.get_scene() if room else None
 
-        switch_state((old_scene, old_room, old_variant),
-                     (scene, room, variant))
+            old_index = self.active_variant_index
+            old_variant = self.variants[old_index] if old_index >= 0 and old_index != index else None
+            old_scene = old_variant.get_room().get_scene() if old_variant else None
+            old_room = old_variant.get_room() if old_variant else None
+            switch_state((old_scene, old_room, old_variant),
+                        (scene, room, variant))
+        self['active_variant_index'] = index
 
     location : bpy.props.FloatVectorProperty(size=2)
     size : bpy.props.FloatVectorProperty(size=2)

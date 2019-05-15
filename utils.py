@@ -63,9 +63,10 @@ def switch_state(old_state, new_state):
         #TODO move this to scene.save_state/load_state
         map_editors = find_map_editor_areas()
         map_image = map_editors[0].spaces.active.image if map_editors else None
-        if map_image:
+        if map_image and old_scene:
             old_scene.map_image = map_image.name
-        new_map_image = scene.get_map_image()
+        
+        new_map_image = scene.get_map_image() if scene else None
         if new_map_image:
             for me in map_editors:
                 me.spaces.active.image = new_map_image
