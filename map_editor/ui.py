@@ -74,6 +74,8 @@ class Smithy2D_ME_SceneListAction(bpy.types.Operator, uibase.LexBaseListAction):
     def new_item(self):
         item = bpy.context.window_manager.smithy2d.new_scene()
         room = item.smithy2d.rooms.add()
+        room.size = (.2, .2)
+        room.location = (.4, .4)
         room.set_name("Room")
         item.smithy2d.set_room(0)
         room.variants.add().set_name("Variant")
