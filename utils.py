@@ -147,6 +147,8 @@ def set_material_image_texture(obj, image_filepath, tile_size=None):
 
     emission_node = get_or_create_input_node(material.node_tree, mat_output, "ShaderNodeEmission", "Emission", "Surface")
     texture_node = get_or_create_input_node(material.node_tree, emission_node, "ShaderNodeTexImage", "Color", "Color")
+    if "Strength" in emission_node.inputs:
+        material.node_tree.links.new(emission_node.inputs['Strength'], texture_node.outputs['Alpha'])
     texture_node.image = image
 
     # connect a mapping node (to only display one tile of the texture)
