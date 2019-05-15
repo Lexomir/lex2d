@@ -23,7 +23,7 @@ class Smithy2D_Object(bpy.types.PropertyGroup):
         return c
 
     def remove_component(self, name):
-        for i, c in enumerate(reversed(self.components)):
+        for i, c in reversed(list(enumerate(self.components))):
             if c.name == name:
                 self.components.remove(i)
 
@@ -41,9 +41,15 @@ class Smithy2D_Image(bpy.types.PropertyGroup):
 
 
 def _rename_smithy2d_scene(old_name, new_name):
+    print("Renaming Scene '{}' to '{}'".format(old_name, new_name))
     scene = bpy.data.scenes.get(old_name)
-    scene.name = new_name
-
+    if scene:
+        scene.name = new_name
+        old_scene_dir = scene_dir_assetpath(old_name)
+        new_scene_dir = scene_dir_assetpath(new_name)
+        move_merge_folders(asset_abspath(old_scene_dir), asset_abspath(new_scene_dir))
+    else:
+        bpy.context.window_manager.smithy2d.ensure_scene_list()
 
 SMITHY2D_INVALID_ID = 0
 class Smithy2D_Scene(bpy.types.PropertyGroup):
@@ -118,7 +124,17 @@ def _scene_changed(old_scene, new_scene):
         switch_state((old_scene, old_room, old_variant), (new_scene, new_room, new_variant))
 
 class Smithy2D_SceneSelectionItem(bpy.types.PropertyGroup):
+    def get_unique_name(self, name):
+        final_name = name
+        i = 0
+        while bpy.data.scenes.get(final_name) and final_name != self.name:
+            i += 1
+            final_name = name + "_" + str(i)
+        
+        return final_name
+
     def set_name_and_update(self, name):
+        name = self.get_unique_name(name)
         old_name = self.get_name()
         _rename_smithy2d_scene(old_name, name)
         self['name'] = name
@@ -156,27 +172,40 @@ class Smithy2D_WindowManager(bpy.types.PropertyGroup):
         scene_item = self.scenes[index]
         scene = bpy.data.scenes.get(scene_item.name)
         self.scenes.remove(index)
-        bpy.data.scenes.remove(scene)
+        if scene:
+            bpy.data.scenes.remove(scene)
 
     def ensure_scene_list(self):
         # INEFFICIENT
         for s in bpy.data.scenes:
             if s.name not in self.scenes:
-                scene_item = self.scenes.add().set_name(s.name)
-        for i, s_item in enumerate(reversed(self.scenes)):
+                scene_item = self.scenes.add()
+                scene_item.set_name(s.name)
+                print('scene "{}" needed sceneitem "{}"'.format(s.name, scene_item.name))
+        for i, s_item in reversed(list(enumerate(self.scenes))):
             if s_item.name not in bpy.data.scenes:
+                print('sceneitem "{}" didnt have a scene. Removing.'.format(s_item.name))
                 self.scenes.remove(i)
 
     scenes : bpy.props.CollectionProperty(type=Smithy2D_SceneSelectionItem)
     active_scene_index : bpy.props.IntProperty(default=-1, set=set_scene_and_update, get=get_scene)
 
+def HACK_sanity_check():
+    bpy.context.window_manager.smithy2d.ensure_scene_list()
+    return .5
+
 def register():
+    bpy.app.timers.register(HACK_sanity_check, persistent=True)
+
     bpy.types.Object.smithy2d = bpy.props.PointerProperty(type=Smithy2D_Object)
     bpy.types.Scene.smithy2d = bpy.props.PointerProperty(type=Smithy2D_Scene)
     bpy.types.Image.smithy2d = bpy.props.PointerProperty(type=Smithy2D_Image)
     bpy.types.WindowManager.smithy2d = bpy.props.PointerProperty(type=Smithy2D_WindowManager)
 
 def unregister():
+    if bpy.app.times.is_registered(HACK_sanity_check):
+        bpy.app.timers.unregister(HACK_sanity_check)
+
     del bpy.types.Object.smithy2d
     del bpy.types.Scene.smithy2d
     del bpy.types.Image.smithy2d

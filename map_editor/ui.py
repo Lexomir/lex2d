@@ -95,6 +95,9 @@ class Smithy2D_RoomUIList(bpy.types.UIList):
 
 
 class Smithy2D_SceneUIList(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        layout.prop(item, "name", text="", emboss=False)
+
     def filter_items(self, context, data, propname):
         indices = range(len(bpy.data.scenes))
         flt_flags = [self.bitflag_filter_item] * len(bpy.data.scenes)

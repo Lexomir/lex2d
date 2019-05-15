@@ -164,6 +164,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
     rotation_quaternion : bpy.props.FloatVectorProperty(size=4)
 
 def _rename_room_script(variant, old_name, name):
+    print("Renaming roomscript  '{}' to '{}'".format(old_name, name))
     # rename variant script file
     scene = variant.id_data
     old_script_assetpath = room_script_assetpath(scene.name, variant.get_room().name, old_name)
@@ -233,12 +234,13 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
     name : bpy.props.StringProperty(set=set_name_and_update, get=get_name)
     object_states : bpy.props.CollectionProperty(type=Smithy2D_ObjectState)
 
-def _rename_room_directory(room, old_name, name):
+def _rename_room_directory(room, scene_name, old_name, name):
     # rename variant script file
-    old_room_dir_assetpath = room_dir_assetpath(old_name)
+    print("Renaming room directory '{}' to '{}'".format(old_name, name))
+    old_room_dir_assetpath = room_dir_assetpath(scene_name, old_name)
     old_room_dir_abspath = asset_abspath(old_room_dir_assetpath)
     if os.path.exists(old_room_dir_abspath):
-        new_room_dir_assetpath = room_dir_assetpath(name)
+        new_room_dir_assetpath = room_dir_assetpath(scene_name, name)
         new_room_dir_abspath = asset_abspath(new_room_dir_assetpath)
         move_merge_folders(old_room_dir_abspath, new_room_dir_abspath)
 
@@ -259,8 +261,9 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
         self['name'] = name
         refresh_screen_area("PROPERTIES")
         
+        scene = self.id_data
         if bpy.data.filepath and name != old_name:
-            _rename_room_directory(self, old_name, name)
+            _rename_room_directory(self, scene.name, old_name, name)
 
     def index(self):
         scene = self.id_data

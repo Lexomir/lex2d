@@ -5,9 +5,15 @@ import os
 import bmesh
 
 def refresh_screen_area(area_type):
-    for area in bpy.context.screen.areas:
-        if area.type == area_type:
-            area.tag_redraw()
+    if bpy.context.screen:
+        for area in bpy.context.screen.areas:
+            if area.type == area_type:
+                area.tag_redraw()
+    else:
+        for screen in bpy.data.screens:
+            for area in screen.areas:
+                if area.type == area_type:
+                    area.tag_redraw()
 
 
 #recursively merge two folders including subfolders
@@ -41,7 +47,7 @@ def switch_state(old_state, new_state):
     if old_variant:
         old_variant.save_scene_state(old_scene)
     
-    if scene != bpy.context.window.scene:
+    if scene and scene != bpy.context.window.scene:
         bpy.context.window.scene = scene
 
     if room:
@@ -299,8 +305,11 @@ def room_script_assetpath(scene_name, room_name, variant_name):
 def asset_scriptpath(assetpath):
     return os.path.relpath(assetpath, start="scripts").replace('\\', '/')
 
-def room_dir_assetpath(room_name):
-    return "scripts/{}".format(room_name)
+def room_dir_assetpath(scene_name, room_name):
+    return "scripts/{}/{}".format(scene_name, room_name)
+
+def scene_dir_assetpath(scene_name):
+    return "scripts/{}".format(scene_name)
 
 def room_scriptpath(scene_name, room_name, variant_name):
     return asset_scriptpath(room_script_assetpath(scene_name, room_name, variant_name))

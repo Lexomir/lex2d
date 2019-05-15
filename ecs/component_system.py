@@ -4,17 +4,6 @@ from ..utils import *
 import sys
 from bpy.app.handlers import persistent
 
-def register():
-    lexsuite = sys.modules.get('lex_suite')
-    globals()['FileWatcher'] = lexsuite.filewatcher.FileWatcher
-
-    #bpy.app.handlers.frame_change_post.append(_frame_change_post)
-    
-
-def unregister():
-    pass
-    #bpy.app.handlers.frame_change_post.remove(_frame_change_post)
-
 
 def parse_input(input_str):
     # expect format:  --$my_name(int, min, max, default)
@@ -198,7 +187,9 @@ def input_updated(bpy_component_instance, bpy_input):
     on_component_updated(bpy.context.scene, bpy_component_instance.id_data, bpy_component_instance)
 
 @persistent
-def _frame_change_post(scene):
+def check_file_changes():
+    scene = bpy.context.scene
+
     # collect used scripts
     used_component_scripts = {} 
     room = scene.smithy2d.get_active_room()
@@ -223,7 +214,20 @@ def _frame_change_post(scene):
                 bpy_component_instance.err_log = component.err_log
                 bpy_component_instance.file_exists = component.filewatcher.file_exists
                 set_bpy_inputs(bpy_component_instance, component.inputs)
+            refresh_screen_area("PROPERTIES")
         component.inputs_changed = False
-    pass
+    
+    return 1.5   # repeat every x seconds 
 
 
+
+def register():
+    lexsuite = sys.modules.get('lex_suite')
+    globals()['FileWatcher'] = lexsuite.filewatcher.FileWatcher
+
+    bpy.app.timers.register(check_file_changes, persistent=True)
+    
+
+def unregister():
+    if bpy.app.timers.is_registered(check_file_changes):
+        bpy.app.timers.unregister(check_file_changes)
