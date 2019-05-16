@@ -59,6 +59,8 @@ def is_backstage(obj):
     return backstage and obj.name in backstage.objects 
 
 def move_backstage(obj):
+    if obj.name in bpy.context.scene.collection.objects:
+        bpy.context.scene.collection.objects.unlink(obj)
     for c in bpy.data.collections:
         if obj.name in c.objects:
             c.objects.unlink(obj)
