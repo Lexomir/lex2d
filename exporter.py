@@ -64,7 +64,7 @@ def serialize_obj_state(obj_state, line_prefix):
                         print("ERROR: Invalid component input in a state for object '{}', component '{}', input ['{}']".format(
                             obj_state.name, sc.get_assetpath(scene, obj_state.get_room()), i[0]))
                         raise
-        serialized_state += "{}\t\t}},\n".format(line_prefix) # end component 
+                serialized_state += "{}\t\t}},\n".format(line_prefix) # end component 
 
     serialized_state += line_prefix + "\t}\n" # end component list
     serialized_state += line_prefix + "}" # end object state
