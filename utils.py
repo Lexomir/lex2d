@@ -66,10 +66,10 @@ def move_backstage(obj):
     backstage = bpy.data.collections.get("Backstage")
     if not backstage:
         backstage = bpy.data.collections.new("Backstage")
-        backstage.hide_viewport = True
     if not "Backstage" in bpy.context.scene.collection.children:
         bpy.context.scene.collection.children.link(backstage)
 
+    backstage.hide_viewport = True
     backstage.objects.link(obj)
 
 def move_onstage(obj):
