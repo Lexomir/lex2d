@@ -41,12 +41,12 @@ def is_map_editor(area):
         and area.spaces.active.image.smithy2d.is_map)
 
 def draw_rooms():
-    if is_map_editor(bpy.context.area):
+    scene = bpy.context.scene.smithy2d.get_active_scene()
+    if is_map_editor(bpy.context.area) and scene:
         room_shader.bind()
         room_shader.uniform_float("MousePos", _mouse_view_location)
         bgl.glEnable(bgl.GL_BLEND)
         bgl.glBlendFunc(bgl.GL_SRC_ALPHA, bgl.GL_ONE_MINUS_SRC_ALPHA)
-        scene = bpy.context.scene.smithy2d.get_active_scene()
         for i, room in enumerate(scene.rooms):
             room_shader.uniform_float("RoomPosition", (room.location[0], room.location[1]))
             room_shader.uniform_float("RoomSize", (room.size[0], room.size[1]))
@@ -213,28 +213,7 @@ def register():
     global _room_draw_handle 
     _room_draw_handle = bpy.types.SpaceImageEditor.draw_handler_add(draw_rooms, (), 'WINDOW', 'POST_VIEW')
     bpy.app.handlers.load_post.append(_on_blendfile_load)
-
     
-    # wm = bpy.context.window_manager
-    # km = wm.keyconfigs.addon.keymaps.new(
-    #     name="Image", space_type='IMAGE_EDITOR', region_type='WINDOW')
-    # wm.keyconfigs.active.keymaps['Image'].keymap_items.new(
-    #     'smithy2d.scale_room',
-    #     value='PRESS',
-    #     type='S',
-    #     ctrl=False,
-    #     alt=False,
-    #     shift=False,
-    #     oskey=False)
-
-    # wm.keyconfigs.active.keymaps['Image'].keymap_items.new(
-    #     'smithy2d.grab_room',
-    #     value='PRESS',
-    #     type='G',
-    #     ctrl=False,
-    #     alt=False,
-    #     shift=False,
-    #     oskey=False)
 
 def unregister():
     if _room_draw_handle:

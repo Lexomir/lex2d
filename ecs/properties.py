@@ -223,15 +223,23 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
 
         objs = bpy_scene.objects
         for o in objs:
-            state = self.object_states.add()
-            state.name = o.name
-            state.save(o)
+            if not is_backstage(o):
+                state = self.object_states.add()
+                state.name = o.name
+                state.save(o)
     
-    def load_scene_state(self, bpy_scene):
+    def load_scene_state(self, bpy_sceneC):
+        prev_objects = bpy.data.objects.keys()
         for state in self.object_states:
-            obj = bpy.data.objects.get(state.name)
-            if obj and obj.name in bpy_scene.objects:
-                state.load(obj)
+            obj = get_or_create_meshobject(state.name)
+            move_onstage(obj)
+            state.load(obj)
+            if obj.name in prev_objects: 
+                prev_objects.remove(obj.name)
+        
+        for prev_obj in prev_objects:
+            assert prev_obj in bpy.data.objects
+            move_backstage(bpy.data.objects.get(prev_obj))
 
     name : bpy.props.StringProperty(set=set_name_and_update, get=get_name)
     object_states : bpy.props.CollectionProperty(type=Smithy2D_ObjectState)

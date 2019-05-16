@@ -46,6 +46,45 @@ def find_map_editor_areas():
                 map_editors.append(area)
     return map_editors
 
+def get_or_create_meshobject(obj_name):
+    obj = bpy.data.objects.get(obj_name)
+    if not obj:
+        print("Cant find '{}' so making it".format(obj_name))
+        data = bpy.data.meshes.new(obj_name)
+        obj = bpy.data.objects.new(obj_name, data)
+    return obj
+
+def is_backstage(obj):
+    backstage = bpy.data.collections.get("Backstage")
+    return backstage and obj.name in backstage.objects 
+
+def move_backstage(obj):
+    for c in bpy.data.collections:
+        if obj.name in c.objects:
+            c.objects.unlink(obj)
+
+    backstage = bpy.data.collections.get("Backstage")
+    if not backstage:
+        backstage = bpy.data.collections.new("Backstage")
+    if not "Backstage" in bpy.context.scene.collection.children:
+        bpy.context.scene.collection.children.link(backstage)
+
+    backstage.objects.link(obj)
+
+def move_onstage(obj):
+    backstage = bpy.data.collections.get("Backstage")
+    if backstage and obj.name in backstage.objects:
+        backstage.objects.unlink(obj)
+    
+    onstage = bpy.data.collections.get("OnStage")
+    if not onstage:
+        onstage = bpy.data.collections.new("OnStage")
+    if not "OnStage" in bpy.context.scene.collection.children:
+        bpy.context.scene.collection.children.link(onstage)
+
+    if obj.name not in onstage.objects:
+        onstage.objects.link(obj)
+
 def switch_state(old_state, new_state):
     old_scene, old_room, old_variant = old_state
     scene, room, variant = new_state
@@ -56,11 +95,12 @@ def switch_state(old_state, new_state):
         name(old_scene), name(old_room), name(old_variant), 
         name(scene), name(room), name(variant)))
 
+    # save the old variant
     if old_variant:
         old_variant.save_scene_state(bpy.context.scene)
     
+    # set the map editor for the new scene
     if old_scene != scene:
-        #TODO move this to scene.save_state/load_state
         map_editors = find_map_editor_areas()
         map_image = map_editors[0].spaces.active.image if map_editors else None
         if map_image and old_scene:
@@ -71,6 +111,14 @@ def switch_state(old_state, new_state):
             for me in map_editors:
                 me.spaces.active.image = new_map_image
 
+    # if switching rooms, remove all room-local components
+    if old_room != room:
+        for obj in bpy.context.scene.objects:
+            for i, c in reversed(list(enumerate(obj.smithy2d.components))):
+                if not c.is_global:
+                    obj.smithy2d.components.remove(i)
+
+    # load the new variant
     if room:
         scene.set_room(room.index())
         if variant:

@@ -56,7 +56,7 @@ def inputs_from_bpy_component(bpy_component):
 def inputs_from_serialized_component(serialized_component):
     serialized_inputs = serialized_component.data
     if not serialized_inputs:
-        return 
+        return []
 
     input_strs = serialized_inputs.split('\n')
     

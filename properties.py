@@ -121,7 +121,6 @@ class Smithy2D_Scene(bpy.types.PropertyGroup):
     map_image : bpy.props.StringProperty()
 
 
-#TODO do i need this
 def _scene_changed(old_scene, new_scene):
         old_room = old_scene.get_active_room() if old_scene else None
         old_variant = old_room.get_active_variant() if old_room else None
@@ -160,7 +159,6 @@ def _blend_load_post(dummy):
             scene.init(bpy_scene.name)
             if bpy_scene != bpy.context.scene:
                 bpy.data.scenes.remove(bpy_scene)
-            #scene.init(bpy_scene.name)
 
 def register():
     bpy.app.handlers.load_post.append(_blend_load_post)

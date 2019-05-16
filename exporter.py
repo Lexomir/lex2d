@@ -1,4 +1,5 @@
 import bpy
+import traceback
 from .utils import *
 from . import ecs
 
@@ -45,22 +46,24 @@ def serialize_obj_state(obj_state, line_prefix):
     for sc in obj_state.components_serialized:
         if sc.name:
             scene = obj_state.get_variant().get_room().get_scene()
-            serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, component_idpath(sc.get_assetpath(scene, obj_state.get_variant().get_room())))
             
             component = ecs.component_system.get_or_create_component(sc.get_assetpath(scene, obj_state.get_variant().get_room()))
             ecs.component_system.recompile_component_if_changed(component)
 
-            stored_inputs = ecs.inputs_from_serialized_component(sc)
-            inputs = ecs.override_script_inputs(base_inputs=component.inputs, overrides=stored_inputs)
+            if component.file_exists():
+                serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, component_idpath(sc.get_assetpath(scene, obj_state.get_variant().get_room())))
 
-            for i in inputs:
-                try:
-                    input_name, input_datatype, input_value, input_args = i
-                    serialized_state += "{}\t\t\t[\"{}\"]={},\n".format(line_prefix, input_name, convert_to_lua_value(input_datatype, input_value))
-                except:
-                    print("ERROR: Invalid component input in a state for object '{}', component '{}', input ['{}']".format(
-                        obj_state.name, sc.get_assetpath(scene, obj_state.get_room()), i[0]))
-                    raise
+                stored_inputs = ecs.inputs_from_serialized_component(sc)
+                inputs = ecs.override_script_inputs(base_inputs=component.inputs, overrides=stored_inputs)
+
+                for i in inputs:
+                    try:
+                        input_name, input_datatype, input_value, input_args = i
+                        serialized_state += "{}\t\t\t[\"{}\"]={},\n".format(line_prefix, input_name, convert_to_lua_value(input_datatype, input_value))
+                    except:
+                        print("ERROR: Invalid component input in a state for object '{}', component '{}', input ['{}']".format(
+                            obj_state.name, sc.get_assetpath(scene, obj_state.get_room()), i[0]))
+                        raise
         serialized_state += "{}\t\t}},\n".format(line_prefix) # end component 
 
     serialized_state += line_prefix + "\t}\n" # end component list
@@ -112,7 +115,7 @@ def export_component_include_file(output_filepath):
         for c in components:
             f.write('Component["{}"] = Engine.require("{}")\n'.format(component_idpath(c), asset_scriptpath(c)))
 
-class export_scene_states_operator(bpy.types.Operator):
+class Smithy2D_ExportSceneStates(bpy.types.Operator):
     bl_idname = "smithy2d.export_scene_states"
     bl_label = "Smithy2D Export Scene States"
 
@@ -132,6 +135,7 @@ class export_scene_states_operator(bpy.types.Operator):
             export_scene_states(scene_states_filepath)
             export_component_include_file(component_includes_filepath)
         except Exception as err:
+            traceback.print_tb(err.__traceback__)
             print(err)
             self.report({"ERROR"}, "Error encountered while exporting scene states. See Console.")
         return {'FINISHED'}

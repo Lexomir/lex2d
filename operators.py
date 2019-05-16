@@ -20,8 +20,6 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
             self.report({'ERROR'}, "Save the project first. This operation needs a project folder.")
             return {"CANCELLED"}
 
-        active_obj = context.object 
-
         # find open file browser window
         file_browsers = [area.spaces.active for area in context.screen.areas if area.type == 'FILE_BROWSER']
         if file_browsers:
@@ -41,6 +39,14 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
 
             # if image, set texture of active object
             filename, file_ext = os.path.splitext(abs_filepath)
+            
+            active_obj = context.object 
+            if not active_obj or not active_obj.select_get():
+                data = bpy.data.meshes.new(filename)
+                active_obj = bpy.data.objects.new(filename, data)
+                move_onstage(active_obj)
+                active_obj.location = bpy.context.scene.cursor.location
+
             if file_ext.lower() in ['.jpg', '.png']:
                 spritesheet_data = find_spritesheet_data_for_image(rel_filepath)
                 tile_size = spritesheet_data['tile_size'] if spritesheet_data else None

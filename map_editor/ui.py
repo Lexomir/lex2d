@@ -56,6 +56,7 @@ class Smithy2D_ME_RoomVariantListAction(bpy.types.Operator, uibase.LexBaseListAc
 
     def on_add(self, item):
         item.set_name("Variant")
+        item.save_scene_state(bpy.context.scene)
 
 
 class Smithy2D_ME_SceneListAction(bpy.types.Operator, uibase.LexBaseListAction):
@@ -134,7 +135,7 @@ class Smithy2D_ME_PT_SceneRooms(bpy.types.Panel):
     
     @classmethod
     def poll(cls, context):
-        return context.space_data and context.space_data.image
+        return context.space_data and context.space_data.image and context.scene.smithy2d.get_active_scene()
 
     def draw_header(self, context):
         self.layout.prop(context.space_data.image.smithy2d, "is_map", text="")
@@ -180,6 +181,7 @@ class Smithy2D_ME_PT_SceneRoomVariants(bpy.types.Panel):
         smithy_scene = context.scene.smithy2d.get_active_scene()
         return (context.space_data 
             and context.space_data.image
+            and smithy_scene
             and smithy_scene.active_room_index >= 0 
             and smithy_scene.rooms)
 

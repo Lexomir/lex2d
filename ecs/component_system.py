@@ -115,6 +115,9 @@ class Component:
         self.err_log = ""
         self.inputs_changed = False
 
+    def file_exists(self):
+        return self.filewatcher.file_exists
+        
     def check_file_change(self):
         return self.filewatcher.look()
 
