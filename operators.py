@@ -42,8 +42,9 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
             
             active_obj = context.object 
             if not active_obj or not active_obj.select_get():
-                data = bpy.data.meshes.new(filename)
-                active_obj = bpy.data.objects.new(filename, data)
+                obj_name = os.path.basename(filename)
+                data = bpy.data.meshes.new(obj_name)
+                active_obj = bpy.data.objects.new(obj_name, data)
                 move_onstage(active_obj)
                 active_obj.location = bpy.context.scene.cursor.location
 
@@ -56,7 +57,7 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
                 tile_size = tile_size or image.size
 
                 render_component = active_obj.smithy2d.add_component("Render2D", is_global=True)
-                render_component.set_input("asset", os.path.splitext(rel_filepath)[0])
+                render_component.set_input("asset", os.path.splitext(rel_filepath)[0].replace('\\', '/'))
 
                 # resize the plane
                 cur_aspect_ratio = active_obj.scale.x / active_obj.scale.y
