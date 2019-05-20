@@ -90,12 +90,9 @@ def add_lex_suite_registered_callback(callback):
 
 @persistent
 def _on_blend_load_post(dummy):
-    # adapt old data into new version
-    for o in bpy.data.objects:
-        render2d_c = o.smithy2d.get_component("Render2D")
-        if render2d_c:
-            asset_path = render2d_c.get_input("asset")
-            render2d_c.set_input('asset', asset_path.replace('\\', '/'))
+    # adapt old data into new version 
+    for im in bpy.data.images:
+        im.colorspace_settings.name = "sRGB"
             
 
 def _lex_suite_registered(lex_suite_module):

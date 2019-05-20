@@ -41,10 +41,10 @@ class Smithy2D_Component(bpy.types.PropertyGroup):
         i = self.inputs.get(name)
         return i.get_value() if i else None
     
-    def set_input(self, name, value):
+    def set_input(self, name, value, propagate=True):
         i = self.inputs.get(name)
         if i:
-            i.set_value(value, propagate=True)
+            i.set_value(value, propagate=propagate)
 
     def refresh(self):
         pass

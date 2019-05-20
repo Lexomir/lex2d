@@ -17,6 +17,7 @@ def _obj_component_updated(scene, obj, smithy_component_instance):
 
             for ext in ['.png', '.jpg']:
                 if os.path.exists(bpy.path.abspath(abs_img_filepath + ext)):
+                    print("Setting object '{}' texture to '{}'".format(obj.name, rel_img_filepath))
                     spritesheet_data = find_spritesheet_data_for_image(rel_img_filepath + ext)
                     tile_size = spritesheet_data['tile_size'] if spritesheet_data else None
                     mat, tex_node = set_material_image_texture(obj, abs_img_filepath + ext, tile_size=tile_size)

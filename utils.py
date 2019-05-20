@@ -202,6 +202,7 @@ def set_material_image_texture(obj, image_filepath, tile_size=None):
     if "Strength" in emission_node.inputs:
         material.node_tree.links.new(emission_node.inputs['Strength'], texture_node.outputs['Alpha'])
     texture_node.image = image
+    texture_node.image.colorspace_settings.name = 'sRGB'
 
     # connect a mapping node (to only display one tile of the texture)
     tile_size = tile_size or image.size
