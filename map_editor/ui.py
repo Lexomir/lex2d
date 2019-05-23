@@ -72,6 +72,12 @@ class Smithy2D_ME_SceneListAction(bpy.types.Operator, uibase.LexBaseListAction):
     def get_index_source(self):
         return bpy.context.scene.smithy2d
 
+    def set_index(self, index, propagate):
+        if propagate:
+            bpy.context.scene.smithy2d.set_scene_and_update(index)
+        else:
+            bpy.context.scene.smithy2d.set_scene(index)
+
     def new_item(self):
         item = bpy.context.scene.smithy2d.scenes.add().init("Scene")
 
