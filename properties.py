@@ -150,25 +150,13 @@ class Smithy2D_ScenePropertyGroup(bpy.types.PropertyGroup):
     active_scene_index : bpy.props.IntProperty(set=set_scene_and_update, get=get_scene)
     scenes : bpy.props.CollectionProperty(type=Smithy2D_Scene)
 
-@persistent
-def _blend_load_post(dummy):
-    for bpy_scene in bpy.data.scenes[:]:
-        if bpy_scene.name not in bpy.context.scene.smithy2d.scenes:
-            print("Making scene:", bpy_scene.name)
-            scene = bpy.context.scene.smithy2d.scenes.add()
-            scene.init(bpy_scene.name)
-            if bpy_scene != bpy.context.scene:
-                bpy.data.scenes.remove(bpy_scene)
 
 def register():
-    bpy.app.handlers.load_post.append(_blend_load_post)
     bpy.types.Object.smithy2d = bpy.props.PointerProperty(type=Smithy2D_Object)
     bpy.types.Scene.smithy2d = bpy.props.PointerProperty(type=Smithy2D_ScenePropertyGroup)
     bpy.types.Image.smithy2d = bpy.props.PointerProperty(type=Smithy2D_Image)
 
 def unregister():
-    if _blend_load_post in bpy.app.handlers.load_post:
-        bpy.app.handlers.load_post.remove(_blend_load_post)
     del bpy.types.Object.smithy2d
     del bpy.types.Scene.smithy2d
     del bpy.types.Image.smithy2d
