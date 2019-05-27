@@ -129,6 +129,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
         self.rotation_quaternion = obj.rotation_quaternion
         self.scale = obj.scale
         self.dimensions = obj.dimensions
+        self.parent = obj.parent.name if obj.parent else ""
 
     # load state into the given object
     def load(self, obj):
@@ -144,6 +145,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
         obj.location = self.location
         obj.rotation_quaternion = self.rotation_quaternion
         obj.scale = self.scale
+        obj.parent = bpy.data.objects.get(self.parent)
 
     def store_data(self, identifier, str_data):
         data = self.custom_state_data.get(identifier)
@@ -164,6 +166,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
     scale : bpy.props.FloatVectorProperty(size=3)
     dimensions : bpy.props.FloatVectorProperty(size=3)
     rotation_quaternion : bpy.props.FloatVectorProperty(size=4)
+    parent : bpy.props.StringProperty(default="")
 
 def _rename_room_script(variant, old_name, name):
     print("Renaming roomscript  '{}' to '{}'".format(old_name, name))

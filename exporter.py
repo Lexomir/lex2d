@@ -27,6 +27,9 @@ def serialize_obj_state(obj_state, line_prefix):
 
     serialized_state = "{}{{\n".format(line_prefix)
     serialized_state += "{}\tname = \"{}\",\n".format(line_prefix, obj_state.name)
+    if obj_state.parent != "":
+        serialized_state += "{}\tparent = \"{}\",\n".format(line_prefix, obj_state.parent)
+
     serialized_state += "{}\tcomponents = {{\n".format(line_prefix)
     
     # transform component
@@ -72,7 +75,6 @@ def serialize_obj_state(obj_state, line_prefix):
 
 
 def export_scene_states(output_filepath):
-
     with open(bpy.path.abspath(output_filepath), 'w') as f:
         serialized_scene = "return {\n"
 

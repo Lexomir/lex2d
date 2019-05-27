@@ -34,7 +34,6 @@ def register():
         shift=False,
         oskey=False)
 
-    km = wm.keyconfigs.addon.keymaps.new(name="Window", space_type='EMPTY')
     kmi = km.keymap_items.new(
         'smithy2d.export_scene_states',
         value='PRESS',
@@ -43,8 +42,19 @@ def register():
         alt=False,
         shift=False,
         oskey=False)
-
     addon_keymaps.append(km)
+
+    km = wm.keyconfigs.addon.keymaps.new(name="3D View", space_type='VIEW_3D')
+    kmi = km.keymap_items.new(
+        'smithy2d.set_parent',
+        value='PRESS',
+        type='P',
+        ctrl=False,
+        alt=False,
+        shift=False,
+        oskey=False)
+    addon_keymaps.append(km)
+
 
 def unregister():
     wm = bpy.context.window_manager

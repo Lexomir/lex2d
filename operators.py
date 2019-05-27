@@ -3,6 +3,7 @@ import os
 import shutil
 import bmesh
 import subprocess
+import mathutils
 from .utils import *
 
 
@@ -136,6 +137,23 @@ class Smithy2D_EditSelectedRoomScript(bpy.types.Operator):
 
         return {"FINISHED"}
 
+class Smithy2D_SetParent(bpy.types.Operator):
+    bl_idname = 'smithy2d.set_parent'
+    bl_label = "Smithy2D Set Parent (no inverse transform)"
+
+    @classmethod
+    def poll(cls, context):
+        return len(context.selected_objects) > 1 and context.active_object
+
+    def execute(self, context):
+        for o in context.selected_objects:
+            if o != context.active_object:
+                matrix_world = o.matrix_world
+                o.parent = context.active_object
+                o.matrix_parent_inverse = mathutils.Matrix()
+                o.matrix_world = matrix_world 
+        return {"FINISHED"}
+    
 
 def draw_item(self, context):
     self.layout.operator("mesh.smithy2d_sprite_add", icon="GHOST_ENABLED", text='Sprite')
