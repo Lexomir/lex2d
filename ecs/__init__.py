@@ -64,7 +64,7 @@ def inputs_from_serialized_component(serialized_component):
     for input_str in input_strs:
         name, datatype, str_value = input_str.split(",", 2)
         value = deserialize_value(datatype, str_value)
-        inputs.append((name, datatype, str_value, []))
+        inputs.append((name, datatype, value, []))
 
     return inputs
 
