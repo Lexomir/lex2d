@@ -45,7 +45,7 @@ def serialize_obj_state(obj_state, line_prefix):
         ('position', 'vec3', [round(v, 3) for v in convert_to_screen_position(obj_state.location)]), 
         ('pivot', 'vec3', [round(v, 3) for v in pivotpos_from_topleft_normalized]), 
         ('rotation_quat', 'vec4', [round(v, 3) for v in obj_state.rotation_quaternion]), 
-        ('size', 'vec3', [round(v, 3) for v in convert_to_screen_size(obj_size)])]
+        ('scale', 'vec3', [round(v, 3) for v in obj_state.scale])]
     for i_n, i_t, i_v in transform_inputs:
         serialized_state += "{}\t\t\t[\"{}\"]={},\n".format(line_prefix, i_n, convert_to_lua_value(i_t, i_v))
 
