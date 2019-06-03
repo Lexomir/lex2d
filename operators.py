@@ -5,6 +5,7 @@ import bmesh
 import subprocess
 import mathutils
 from .utils import *
+from . import ObjUtils
 
 
 
@@ -154,6 +155,16 @@ class Smithy2D_SetParent(bpy.types.Operator):
                 o.matrix_world = matrix_world 
         return {"FINISHED"}
     
+
+class Smithy2D_SetOriginToObjectTopLeft(bpy.types.Operator):
+    bl_idname = 'smithy2d.set_origin_to_obj_topleft'
+    bl_label = "Smithy2D Set Origin to obj top left"
+
+    def execute(self, context):
+        bounds = ObjUtils.BoundingBox(context.object)
+        scaled_bbl = [v * ov for v, ov in zip(bounds.get_bottombackleft(), context.object.scale)]
+        ObjUtils.set_origin(context.object, context.object.location + mathutils.Vector(scaled_bbl))
+        return {'FINISHED'}
 
 def draw_item(self, context):
     self.layout.operator("mesh.smithy2d_sprite_add", icon="GHOST_ENABLED", text='Sprite')

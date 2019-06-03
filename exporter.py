@@ -2,6 +2,7 @@ import bpy
 import traceback
 from .utils import *
 from . import ecs
+from mathutils import Vector
 
 def serialize_obj_state(obj_state, line_prefix):
     def convert_to_lua_value(datatype, val):
@@ -35,9 +36,14 @@ def serialize_obj_state(obj_state, line_prefix):
     # transform component
     serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, component_idpath(global_component_assetpath("Transform")))
 
-    obj_size = obj_state.dimensions if is_renderable(obj_state) else obj_state.scale
+    obj_size = Vector(obj_state.dimensions) if is_renderable(obj_state) else Vector(obj_state.scale)
+    topleft_pos = Vector(obj_state.location) + multiply_vec3(Vector(obj_state.topleft), obj_state.scale)
+    pivotpos_from_topleft = multiply_vec3(Vector(obj_state.topleft), obj_state.scale) * -1
+    pivotpos_from_topleft_normalized = [a / b if b != 0 else a for a,b in zip(pivotpos_from_topleft, obj_size)]
+    pivotpos_from_topleft_normalized[1] *= -1  # invert y because topleft coordinate system
     transform_inputs = [
-        ('position', 'vec3', [round(v, 3) for v in convert_to_screen_position(obj_state.location)]), 
+        ('position', 'vec3', [round(v, 3) for v in convert_to_screen_position(topleft_pos)]), 
+        ('pivot', 'vec3', [round(v, 3) for v in pivotpos_from_topleft_normalized]), 
         ('rotation_quat', 'vec4', [round(v, 3) for v in obj_state.rotation_quaternion]), 
         ('size', 'vec3', [round(v, 3) for v in convert_to_screen_size(obj_size)])]
     for i_n, i_t, i_v in transform_inputs:

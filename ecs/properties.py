@@ -3,6 +3,8 @@ import sys
 import shutil
 from ..utils import *
 from ..generic_value import GenericValue 
+from .. import ObjUtils
+from mathutils import Vector
 
 
 class Smithy2D_ComponentInput(bpy.types.PropertyGroup, GenericValue):
@@ -126,6 +128,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
                 sc.serialize(c)
 
         self.location = obj.location
+        self.topleft = ObjUtils.BoundingBox(obj).get_bottombackleft() # doesnt account for scale
         self.rotation_quaternion = obj.rotation_quaternion
         self.scale = obj.scale
         self.dimensions = obj.dimensions
@@ -142,9 +145,21 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
             new_sc.deserialize(bpy_c)
             component_system.refresh_inputs(scene, room, bpy_c)
 
-        obj.location = self.location
+        if obj.type == "MESH":
+            # find the delta vertex movement of object (compare the top left bounding box of both states)
+            bounds = ObjUtils.BoundingBox(obj)
+            tl = obj.location + multiply_vec3(bounds.get_bottombackleft(), obj.scale)
+            new_tl = Vector(self.location) + multiply_vec3(self.topleft, self.scale)
+            vert_move_amt = new_tl - tl
+            # shift the object (in order to move it's verts in the right spot), then set the object's origin
+            obj.location += vert_move_amt
+            obj.scale = self.scale
+            ObjUtils.set_origin(obj, Vector(self.location))
+        else:
+            obj.scale = self.scale
+            obj.location = self.location
+
         obj.rotation_quaternion = self.rotation_quaternion
-        obj.scale = self.scale
         obj.parent = bpy.data.objects.get(self.parent)
 
     def store_data(self, identifier, str_data):
@@ -163,6 +178,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
     components_serialized : bpy.props.CollectionProperty(type=Smithy2D_SerializedComponent)
     custom_state_data : bpy.props.CollectionProperty(type=Smithy2D_LexStringProperty)
     location : bpy.props.FloatVectorProperty(size=3)
+    topleft : bpy.props.FloatVectorProperty(size=3)
     scale : bpy.props.FloatVectorProperty(size=3)
     dimensions : bpy.props.FloatVectorProperty(size=3)
     rotation_quaternion : bpy.props.FloatVectorProperty(size=4)

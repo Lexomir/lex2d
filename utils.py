@@ -3,6 +3,7 @@ import sys
 import shutil
 import os
 import bmesh
+from mathutils import Vector
 
 def refresh_screen_area(area_type):
     if bpy.context.screen:
@@ -15,6 +16,8 @@ def refresh_screen_area(area_type):
                 if area.type == area_type:
                     area.tag_redraw()
 
+def multiply_vec3(vec, other_vec):
+    return Vector([vec[0] * other_vec[0], vec[1] * other_vec[1], vec[2] * other_vec[2]])
 
 #recursively merge two folders including subfolders
 def merge_overwrite(root_src_dir, root_dst_dir):
