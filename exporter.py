@@ -42,7 +42,7 @@ def serialize_obj_state(obj_state, line_prefix):
     pivotpos_from_topleft_normalized = [a / b if b != 0 else a for a,b in zip(pivotpos_from_topleft, obj_size)]
     pivotpos_from_topleft_normalized[1] *= -1  # invert y because topleft coordinate system
     transform_inputs = [
-        ('position', 'vec3', [round(v, 3) for v in convert_to_screen_position(topleft_pos)]), 
+        ('position', 'vec3', [round(v, 3) for v in convert_to_screen_position(obj_state.location)]), 
         ('pivot', 'vec3', [round(v, 3) for v in pivotpos_from_topleft_normalized]), 
         ('rotation_quat', 'vec4', [round(v, 3) for v in obj_state.rotation_quaternion]), 
         ('size', 'vec3', [round(v, 3) for v in convert_to_screen_size(obj_size)])]
