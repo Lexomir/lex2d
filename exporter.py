@@ -37,6 +37,7 @@ def serialize_obj_state(obj_state, line_prefix):
     serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, component_idpath(global_component_assetpath("Transform")))
 
     obj_size = Vector(obj_state.dimensions) if is_renderable(obj_state) else Vector(obj_state.scale)
+    raw_size =  [a / b if b != 0 else a for a,b in zip(obj_size, obj_state.scale)]
     topleft_pos = Vector(obj_state.location) + multiply_vec3(Vector(obj_state.topleft), obj_state.scale)
     pivotpos_from_topleft = multiply_vec3(Vector(obj_state.topleft), obj_state.scale) * -1
     pivotpos_from_topleft_normalized = [a / b if b != 0 else a for a,b in zip(pivotpos_from_topleft, obj_size)]
@@ -45,6 +46,7 @@ def serialize_obj_state(obj_state, line_prefix):
         ('position', 'vec3', [round(v, 3) for v in convert_to_screen_position(obj_state.location)]), 
         ('pivot', 'vec3', [round(v, 3) for v in pivotpos_from_topleft_normalized]), 
         ('rotation_quat', 'vec4', [round(v, 3) for v in obj_state.rotation_quaternion]), 
+        ('size', 'vec4', [round(v, 3) for v in convert_to_screen_size(raw_size)]), 
         ('scale', 'vec3', [round(v, 3) for v in obj_state.scale])]
     for i_n, i_t, i_v in transform_inputs:
         serialized_state += "{}\t\t\t[\"{}\"]={},\n".format(line_prefix, i_n, convert_to_lua_value(i_t, i_v))
