@@ -171,6 +171,7 @@ class GenericValue:
         finally: return val
 
     def _set_value_as_float(self, val, propagate=False):
+        if val < self.min_value or val > self.max_value: print("Input Error: Value '{}' exceeded param range [{}, {}]".format(val, self.min_value, self.max_value))
         val = max(self.min_value, min(val, self.max_value))
         str_val = str(val)
         if str_val != self.string_value:
@@ -182,6 +183,7 @@ class GenericValue:
         finally: return val
 
     def _set_value_as_int(self, val, propagate=False):
+        if val < self.min_value or val > self.max_value: print("Input Error: Value '{}' exceeded param range [{}, {}]".format(val, self.min_value, self.max_value))
         val = max(self.min_value, min(val, self.max_value))
         str_val = str(val)
         if str_val != self.string_value:
