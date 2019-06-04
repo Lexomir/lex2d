@@ -131,7 +131,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
         self.topleft = ObjUtils.BoundingBox(obj).get_bottombackleft() # doesnt account for scale
         self.rotation_quaternion = obj.rotation_quaternion
         self.scale = obj.scale
-        self.dimensions = obj.dimensions
+        self.bounds.set_from_object(obj)
         self.parent = obj.parent.name if obj.parent else ""
 
     # load state into the given object
@@ -181,6 +181,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
     topleft : bpy.props.FloatVectorProperty(size=3)
     scale : bpy.props.FloatVectorProperty(size=3)
     dimensions : bpy.props.FloatVectorProperty(size=3)
+    bounds : bpy.props.PointerProperty(type=ObjUtils.BpyBoundingBox)
     rotation_quaternion : bpy.props.FloatVectorProperty(size=4)
     parent : bpy.props.StringProperty(default="")
 

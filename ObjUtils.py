@@ -18,6 +18,9 @@ def set_origin(obj, origin):
 
 
 class BoundingBoxBase:
+    def get_dimensions(self):
+        return mathutils.Vector(self.box_max) -  mathutils.Vector(self.box_min)
+        
     def set_from_object(self, obj):
         coords = [coord[:] for coord in obj.bound_box]
         axis_values = zip(*coords)
