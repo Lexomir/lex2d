@@ -24,11 +24,10 @@ def remove_component_updated_callback(func):
 def validate_input(name, datatype, value, args):
     try:
         if datatype == "": return False
-        elif not value: return False
         elif datatype == 'enum' and value not in args: return False
         elif datatype in ['float', 'int']: return float(args[0]) <= float(value) <= float(args[1])
         elif 'vec' in datatype: return len(value) > 0 and isinstance(value[0], (int, float))
-        elif datatype == 'string': return type(value).__name__ == 'str'
+        elif datatype == 'string': return type(value).__name__ == 'str' and value
         else:
             return True
     except:
