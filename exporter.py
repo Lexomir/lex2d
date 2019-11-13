@@ -36,7 +36,6 @@ def serialize_obj_state(obj_state, line_prefix):
     # transform component
     serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, component_idpath(global_component_assetpath("Transform")))
 
-    obj_size = Vector(obj_state.bounds.get_dimensions()) if is_renderable(obj_state) else Vector(obj_state.scale)
     mesh_size =  obj_state.bounds.get_dimensions()
     pivotpos_from_topleft = Vector(obj_state.topleft) * -1
     pivotpos_from_topleft_normalized = [a / b if b != 0 else a for a,b in zip(pivotpos_from_topleft, mesh_size)]

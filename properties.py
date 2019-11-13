@@ -1,10 +1,299 @@
 import bpy
-from . import ecs
+from . import ecs, ObjUtils, dialog_system
+from .dialog_system import TEXT_INPUT_PADDING, DIALOG_PADDING, WIDGET_PADDING
 from .utils import *
 import time
 import sys
 from bpy.app.handlers import persistent
+import blf
 
+class Smithy2D_LexStringProperty(bpy.types.PropertyGroup):
+    value : bpy.props.StringProperty()
+
+class Smithy2D_SerializedComponent(bpy.types.PropertyGroup):
+    name : bpy.props.StringProperty()
+    is_global : bpy.props.BoolProperty(default=False)
+    data : bpy.props.StringProperty()
+
+    def get_assetpath(self, scene, room):
+        if self.is_global:
+            return global_component_assetpath(self.name)
+        else:
+            return component_assetpath(self.name, scene.name, room.name)
+
+    def serialize(self, bpy_component_instance):
+        self.name = bpy_component_instance.name
+        self.is_global = bpy_component_instance.is_global
+        serialized_inputs = ""
+        for i in bpy_component_instance.inputs:
+            serialized_inputs += i.name + "," + i.datatype + "," + i._get_string_value() + "\n"
+
+        self.data = serialized_inputs[:-1]  # without last '\n'
+
+    def deserialize(self, bpy_component_instance):
+        serialized_inputs = self.data
+        if not serialized_inputs:
+            return 
+
+        input_strs = serialized_inputs.split('\n')
+        
+        c = bpy_component_instance
+        c.set_name(self.name)
+        c.set_is_global(self.is_global)
+        c.inputs.clear()
+        for input_str in input_strs:
+            name, datatype, str_value = input_str.split(",", 2)
+            ci = c.inputs.add()
+            ci.name = name
+            ci.datatype = datatype
+            ci._set_string_value(str_value)
+
+class Smithy2D_ObjectState(bpy.types.PropertyGroup):
+    def get_name(self):
+        return self.name
+
+    def get_variant(self):
+        bpy_scene = self.id_data
+        room = bpy_scene.path_resolve(".".join(self.path_from_id().split('.')[0:-1]))
+        return room
+
+    # save object state
+    def save(self, obj):
+        self.components_serialized.clear()
+        for c in obj.smithy2d.components:
+            if c.name:
+                sc = self.components_serialized.add()
+                sc.serialize(c)
+
+        self.location = obj.location
+        self.topleft = ObjUtils.BoundingBox(obj).get_bottombackleft() # bottom back left of the raw data (not scaled)
+        self.rotation_quaternion = obj.rotation_quaternion
+        self.scale = obj.scale
+        self.bounds.set_from_object(obj)
+        self.parent = obj.parent.name if obj.parent else ""
+        self.obj_type = obj.type
+
+    # load state into the given object
+    def load(self, obj):
+        room = self.get_variant().get_room()
+        scene = room.get_scene()
+        component_system = obj.smithy2d.get_component_system()
+        obj.smithy2d.components.clear()
+        for new_sc in self.components_serialized:
+            bpy_c = obj.smithy2d.add_component(new_sc.name, is_global=new_sc.is_global, calc_inputs=False)
+            new_sc.deserialize(bpy_c)
+            component_system.refresh_inputs(scene, room, bpy_c)
+
+        if obj.type == "MESH":
+            # find the delta vertex movement of object (compare the top left bounding box of both states)
+            bounds = ObjUtils.BoundingBox(obj)
+            tl = obj.location + multiply_vec3(bounds.get_bottombackleft(), obj.scale)
+            new_tl = Vector(self.location) + multiply_vec3(self.topleft, self.scale)
+            vert_move_amt = new_tl - tl
+            # shift the object (in order to move it's verts in the right spot), then set the object's origin
+            obj.location += vert_move_amt
+            obj.scale = self.scale
+            ObjUtils.set_origin(obj, Vector(self.location))
+        else:
+            obj.scale = self.scale
+            obj.location = self.location
+
+        obj.rotation_quaternion = self.rotation_quaternion
+        obj.parent = bpy.data.objects.get(self.parent)
+
+    def store_data(self, identifier, str_data):
+        data = self.custom_state_data.get(identifier)
+        if not data:
+            data = self.custom_state_data.add()
+            data.name = identifier
+        data.value = str_data
+
+    def get_data(self, identifier):
+        data = self.custom_state_data.get(identifier)
+        if data:
+            return data.value
+        return None
+
+    components_serialized : bpy.props.CollectionProperty(type=Smithy2D_SerializedComponent)
+    custom_state_data : bpy.props.CollectionProperty(type=Smithy2D_LexStringProperty)
+    location : bpy.props.FloatVectorProperty(size=3)
+    topleft : bpy.props.FloatVectorProperty(size=3)
+    scale : bpy.props.FloatVectorProperty(size=3)
+    dimensions : bpy.props.FloatVectorProperty(size=3)
+    bounds : bpy.props.PointerProperty(type=ObjUtils.BpyBoundingBox)
+    rotation_quaternion : bpy.props.FloatVectorProperty(size=4)
+    parent : bpy.props.StringProperty(default="")
+    obj_type : bpy.props.StringProperty(default="MESH")
+
+class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
+    def __str__(self):
+        room = self.get_room()
+        return "{}:{}:{}".format(room.get_scene().name, room.name, self.name)
+        
+    def get_unique_name(self, name):
+        room = self.get_room()
+        scene = room.get_scene()
+        final_name = name
+        i = 0
+        found_name = False
+        while not found_name and final_name != self.name:
+            variant_script_filepath = asset_abspath(room_script_assetpath(scene.name, room.name, final_name))
+            if not os.path.exists(variant_script_filepath):
+                found_name = True
+            else:  
+                i += 1
+                final_name = name + "_" + str(i)
+        
+        return final_name
+    
+    def index(self):
+        room = self.get_room()
+        for i, v in enumerate(room.variants):
+            if v == self:
+                return i
+
+    def init(self, name):
+        room = self.get_room()
+        scene = room.get_scene()
+
+        name = self.get_unique_name(name)
+        variant_script_filepath = asset_abspath(room_script_assetpath(scene.name, room.name, name))
+        if not os.path.exists(variant_script_filepath) and create_room_script(scene.name, room.name, name):
+            self.set_name(name)
+        else:
+            print("ERROR: Setting variant name to '{}', but there is already a script file at '{}'".format(name, variant_script_filepath))
+
+    def set_name(self, val):
+        self['name'] = val
+        refresh_screen_area("PROPERTIES")
+       
+    def get_name(self):
+        return self.get('name', "")
+
+    def get_room(self):
+        bpy_scene = self.id_data
+        room = bpy_scene.path_resolve(".".join(self.path_from_id().split('.')[0:-1]))
+        return room
+
+    def save_scene_state(self, bpy_scene):
+        self.object_states.clear()
+
+        objs = bpy_scene.objects
+        for o in objs:
+            if not is_backstage(o):
+                state = self.object_states.add()
+                state.name = o.name
+                state.save(o)
+    
+    def load_scene_state(self, bpy_scene):
+        prev_objects = bpy.data.objects.keys()
+        for state in self.object_states:
+            obj = get_or_create_object(state.name, state.obj_type)
+            move_onstage(obj)
+            state.load(obj)
+            if obj.name in prev_objects:
+                prev_objects.remove(obj.name)
+        
+        for prev_obj in prev_objects:
+            assert prev_obj in bpy.data.objects
+            move_backstage(bpy.data.objects.get(prev_obj))
+
+    name : bpy.props.StringProperty(get=get_name)
+    object_states : bpy.props.CollectionProperty(type=Smithy2D_ObjectState)
+
+class Smithy2D_Room(bpy.types.PropertyGroup):
+    def init(self, name):
+        name = self.get_unique_name(name)
+        scene = self.get_scene()
+        room_dir_abspath = asset_abspath(room_dir_assetpath(scene.name, name))
+        if not os.path.exists(room_dir_abspath):
+            self.set_name(name)
+        else:
+            print("ERROR: Setting room name to '{}', but there is already a directory at '{}'".format(name, room_dir_abspath))
+
+        self.variants.add().init('Variant')
+        self.set_variant(0)
+        self.size = (.2, .2)
+        self.location = (.4, .4)
+        return self
+
+    def __str__(self):
+        return "{}:{}".format(self.get_scene().name, self.name)
+
+    def get_unique_name(self, name):
+        scene = self.get_scene()
+        final_name = name
+        i = 0
+        found_name = False
+        while not found_name and final_name != self.name:
+            room_dir_abspath = asset_abspath(room_dir_assetpath(scene.name, final_name))
+            if not os.path.exists(room_dir_abspath):
+                found_name = True
+            else:  
+                i += 1
+                final_name = name + "_" + str(i)
+        return final_name
+
+    def index(self):
+        scene = self.get_scene()
+        for i, r in enumerate(scene.rooms):
+            if r == self:
+                return i
+
+    def set_name(self, val):
+        self['name'] = val
+        refresh_screen_area("PROPERTIES")
+       
+    def get_name(self):
+        return self.get('name', "")
+
+    def get_scene(self):
+        bpy_scene = self.id_data
+        scene = bpy_scene.path_resolve(".".join(self.path_from_id().split('.')[0:-1]))
+        return scene
+
+    def contains(self, point):
+        return (point[0] >= self.location[0] and point[0] <= (self.location[0] + self.size[0]) 
+            and point[1] >= self.location[1] and point[1] <= (self.location[1] + self.size[1]))
+    
+    def get_active_variant(self):
+        if self.active_variant_index >= 0 and self.variants:
+            return self.variants[self.active_variant_index]
+        return None
+
+    def load_variant(self, index, force=False):
+        variant = self.variants[index] if self.variants and index >= 0 else None
+        if not variant or (variant == self.get_active_variant() and not force):
+            return 
+        if variant:
+            load_state((self.get_scene(), self, variant))
+
+    def set_variant(self, index):
+        self['active_variant_index'] = index
+
+    def get_variant(self):
+        return self.get('active_variant_index', -1)
+
+    def set_variant_and_update(self, index):
+        if index == self.active_variant_index: return
+        variant = self.variants[index] if index >= 0 else None
+        if variant:
+            room = variant.get_room() if variant else None
+            scene = room.get_scene() if room else None
+
+            old_index = self.active_variant_index
+            old_variant = self.variants[old_index] if old_index >= 0 and old_index != index else None
+            old_scene = old_variant.get_room().get_scene() if old_variant else None
+            old_room = old_variant.get_room() if old_variant else None
+            switch_state((old_scene, old_room, old_variant),
+                        (scene, room, variant))
+        self['active_variant_index'] = index
+
+    location : bpy.props.FloatVectorProperty(size=2)
+    size : bpy.props.FloatVectorProperty(size=2)
+    variants : bpy.props.CollectionProperty(type=Smithy2D_RoomVariant)
+    active_variant_index: bpy.props.IntProperty(default=-1, set=set_variant_and_update, get=get_variant)
+    name : bpy.props.StringProperty(get=get_name)
 
 class Smithy2D_Object(bpy.types.PropertyGroup):
     def get_component(self, name):
@@ -41,43 +330,52 @@ class Smithy2D_Image(bpy.types.PropertyGroup):
     is_map : bpy.props.BoolProperty(default=False)
 
 
-def _rename_smithy2d_scene(old_name, new_name):
-    print("Renaming Scene '{}' to '{}'".format(old_name, new_name))
-    old_scene_dir = scene_dir_assetpath(old_name)
-    new_scene_dir = scene_dir_assetpath(new_name)
-    move_merge_folders(asset_abspath(old_scene_dir), asset_abspath(new_scene_dir))
-
 SMITHY2D_INVALID_ID = 0
 class Smithy2D_Scene(bpy.types.PropertyGroup):
+    def __str__(self):
+        return self.name
+        
     def init(self, name):
-        self.set_name(name)
+        name = self.get_unique_name(name)
+        scene_dir_abspath = asset_abspath(scene_dir_assetpath(name))
+        if not os.path.exists(scene_dir_abspath):
+            self.set_name(name)
+        else:
+            print("ERROR: Setting scene name to '{}', but there is already a directory at '{}'".format(name, scene_dir_abspath))
+
         room = self.rooms.add().init("Room")
         self.set_room(0)
 
         return self
 
     def get_unique_name(self, name):
-        bpy_scene = self.id_data
         final_name = name
         i = 0
-        while bpy_scene.smithy2d.scenes.get(final_name) and final_name != self.name:
-            i += 1
-            final_name = name + "_" + str(i)
+        found_name = False
+        while not found_name and final_name != self.name:
+            scene_dir_abspath = asset_abspath(scene_dir_assetpath(final_name))
+            if not os.path.exists(scene_dir_abspath):
+                found_name = True
+            else:  
+                i += 1
+                final_name = name + "_" + str(i)
         
         return final_name
 
     def set_name(self, name):
-        name = self.get_unique_name(name)
         self['name'] = name
-
-    def set_name_and_update(self, name):
-        name = self.get_unique_name(name)
-        if name != self.get_name():
-            _rename_smithy2d_scene(self.name, name)
-            self['name'] = name
+        refresh_screen_area("PROPERTIES")
         
     def get_name(self):
         return self['name'] if 'name' in self else ''
+
+    def load_room(self, index, force=False):
+        room = self.rooms[index] if self.rooms and index >= 0 else None
+        if not room or (room == self.get_active_room() and not force):
+            return 
+        variant = room.get_active_variant() if room else None
+        if variant:
+            load_state((self, room, variant))
 
     def set_room_and_update(self, index):
         old_index = self.active_room_index
@@ -115,8 +413,8 @@ class Smithy2D_Scene(bpy.types.PropertyGroup):
     def get_map_image(self):
         return bpy.data.images.get(self.map_image)
 
-    name : bpy.props.StringProperty(set=set_name_and_update, get=get_name)
-    rooms : bpy.props.CollectionProperty(type=ecs.properties.Smithy2D_Room)
+    name : bpy.props.StringProperty(get=get_name)
+    rooms : bpy.props.CollectionProperty(type=Smithy2D_Room)
     active_room_index : bpy.props.IntProperty(default=-1, get=get_room, set=set_room_and_update)
     map_image : bpy.props.StringProperty()
 
@@ -135,6 +433,16 @@ class Smithy2D_ScenePropertyGroup(bpy.types.PropertyGroup):
         else:
             return None
 
+    def load_scene(self, index, force=False):
+        new_scene = self.scenes[index] if self.scenes and index >= 0 else None
+        if not new_scene or (new_scene == self.get_active_scene() and not force):
+            return 
+
+        new_room = new_scene.get_active_room() if new_scene else None
+        new_variant = new_room.get_active_variant() if new_room else None
+        if new_variant:
+            load_state((new_scene, new_room, new_variant))
+
     def set_scene(self, index):
         self['active_scene_index'] = index
 
@@ -149,6 +457,7 @@ class Smithy2D_ScenePropertyGroup(bpy.types.PropertyGroup):
 
     active_scene_index : bpy.props.IntProperty(set=set_scene_and_update, get=get_scene)
     scenes : bpy.props.CollectionProperty(type=Smithy2D_Scene)
+
 
 
 def register():

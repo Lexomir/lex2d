@@ -168,3 +168,5 @@ class Smithy2D_NewComponentScript(bpy.types.Operator):
             ecs.get_component_system().refresh_inputs(scene, scene.get_active_room(), c)
             bpy.ops.smithy2d.open_component_script_external()
         return {"FINISHED"}
+
+

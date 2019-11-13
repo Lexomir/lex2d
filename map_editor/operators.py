@@ -95,6 +95,7 @@ class Smithy2D_RoomSelector(bpy.types.Operator):
         global _editor_area
         if event.type == 'MOUSEMOVE':
             editor_areas = [area for area in bpy.context.screen.areas if is_map_editor(area)]
+            _editor_area = None
             for area in editor_areas:
                 region = area.regions[-1]
                 region_x = event.mouse_x - region.x
@@ -106,11 +107,21 @@ class Smithy2D_RoomSelector(bpy.types.Operator):
             for area in editor_areas:
                 area.tag_redraw()
         if event.type == 'RIGHTMOUSE' and event.value == "PRESS":
-            if _editor_area:
-                for i, room in enumerate(scene.rooms):
-                    if room.contains(_mouse_view_location):
-                        scene.active_room_index = i
-                        return {'RUNNING_MODAL'}
+            editor_areas = [area for area in bpy.context.screen.areas if is_map_editor(area)]
+            _editor_area = None
+            for area in editor_areas:
+                region = area.regions[-1]
+                region_x = event.mouse_x - region.x
+                region_y = event.mouse_y - region.y
+                if region_x >= 0 and region_x <= region.width and region_y >= 0 and region_y <= region.height:
+                    _mouse_view_location = region.view2d.region_to_view(regison_x, region_y)
+                    _editor_area = area
+                    for i, room in enumerate(scene.rooms):
+                        if room.contains(_mouse_view_location):
+                            scene.active_room_index = i
+                            break
+        if not _editor_area:
+            _mouse_view_location = (-1, -1)
 
         return {'PASS_THROUGH'}
  

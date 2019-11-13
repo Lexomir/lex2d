@@ -147,7 +147,7 @@ def recompile_component_if_changed(component):
 
 # -------------------------------------------------------
 
-# set the inputs in the ui
+# sync the current ui inputs with the base inputs parsed from the script
 def set_bpy_inputs(bpy_component, parsed_inputs):
     # match the ui component list size to the parsed list
     num_inputs = len(parsed_inputs)
@@ -166,7 +166,7 @@ def set_bpy_inputs(bpy_component, parsed_inputs):
         bpy_input.name = i_name
         bpy_input.set_generic(i_datatype, i_value, i_args)
 
-
+# check for script changes and sync the current input values with the input slots in the script 
 def refresh_inputs(scene, room, bpy_component_instance):
     c_assetpath = bpy_component_instance.get_assetpath(scene, room)
     if c_assetpath:

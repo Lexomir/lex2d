@@ -8,6 +8,12 @@ class Smithy2D_ME_RoomListAction(bpy.types.Operator, uibase.LexBaseListAction):
     bl_idname = "lexlistaction.smithy2d_room_list_action"
     bl_label = "Smithy2D Room List Action"
 
+    def on_execute(self, context):
+        if not bpy.data.filepath:
+            self.report({"ERROR"}, "Save the project first. This operation needs a project folder.")
+            return False
+        return True
+
     def get_collection(self):
         return bpy.context.scene.smithy2d.get_active_scene().rooms
 
@@ -25,16 +31,25 @@ class Smithy2D_ME_RoomListAction(bpy.types.Operator, uibase.LexBaseListAction):
             smithy_scene.set_room(index)
 
     def on_add(self, item):
-        item.set_name("Room")
-        item.variants.add().set_name("Variant")
-        item.set_variant(0)
-        item.size = (.2, .2)
-        item.location = (.4, .4)
-        refresh_screen_area("IMAGE_EDITOR")
+        if self.shift:
+            bpy.ops.smithy2d.room_renamer('INVOKE_DEFAULT', room_datapath=item.path_from_id(), name="Room", force=True)
+        else:
+            item.init("Room")
+
+    def remove_item(self, item_idx):
+        item = self.get_collection()[item_idx]
+        bpy.ops.smithy2d.room_deleter('INVOKE_DEFAULT', datapath=item.path_from_id(), force=self.shift)
+
 
 class Smithy2D_ME_RoomVariantListAction(bpy.types.Operator, uibase.LexBaseListAction):
     bl_idname = "lexlistaction.smithy2d_roomvariant_list_action"
     bl_label = "Smithy2D Room Variant List Action"
+
+    def on_execute(self, context):
+        if not bpy.data.filepath:
+            self.report({"ERROR"}, "Save the project first. This operation needs a project folder.")
+            return False
+        return True
 
     def get_collection(self):
         room = bpy.context.scene.smithy2d.get_active_scene().get_active_room()
@@ -55,13 +70,26 @@ class Smithy2D_ME_RoomVariantListAction(bpy.types.Operator, uibase.LexBaseListAc
         return room
 
     def on_add(self, item):
-        item.set_name("Variant")
+        if self.shift:
+            bpy.ops.smithy2d.variant_renamer('INVOKE_DEFAULT', variant_datapath=item.path_from_id(), name="Variant", force=True)
+        else:
+            item.init("Variant")
         item.save_scene_state(bpy.context.scene)
+
+    def remove_item(self, item_idx):
+        item = self.get_collection()[item_idx]
+        bpy.ops.smithy2d.variant_deleter('INVOKE_DEFAULT', datapath=item.path_from_id(), force=self.shift)
 
 
 class Smithy2D_ME_SceneListAction(bpy.types.Operator, uibase.LexBaseListAction):
     bl_idname = "lexlistaction.smithy2d_scene_list_action"
     bl_label = "Smithy2D Scene List Action"
+
+    def on_execute(self, context):
+        if not bpy.data.filepath:
+            self.report({"ERROR"}, "Save the project first. This operation needs a project folder.")
+            return False
+        return True
 
     def get_collection(self):
         return bpy.context.scene.smithy2d.scenes
@@ -79,23 +107,42 @@ class Smithy2D_ME_SceneListAction(bpy.types.Operator, uibase.LexBaseListAction):
             bpy.context.scene.smithy2d.set_scene(index)
 
     def new_item(self):
-        item = bpy.context.scene.smithy2d.scenes.add().init("Scene")
-
+        item = bpy.context.scene.smithy2d.scenes.add()
         refresh_screen_area("IMAGE_EDITOR")
         return item
 
+    def on_add(self, item):
+        if self.shift:
+            bpy.ops.smithy2d.scene_renamer('INVOKE_DEFAULT', scene_datapath=item.path_from_id(), name="Scene", force=True)
+        else:
+            item.init("Scene")
+
+    def remove_item(self, item_idx):
+        item = self.get_collection()[item_idx]
+        bpy.ops.smithy2d.scene_deleter('INVOKE_DEFAULT', datapath=item.path_from_id(), force=self.shift)
+
+
+class Smithy2D_VariantUIList(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        operator = layout.operator("smithy2d.variant_renamer", icon="GREASEPENCIL", text="")
+        operator['name'] = item.name
+        operator.variant_datapath = item.path_from_id()
+        layout.label(text=item.name)
 
 class Smithy2D_RoomUIList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.prop(item, "name", text="", emboss=False)
-
-    def invoke(self, context, event):
-        pass
+        operator = layout.operator("smithy2d.room_renamer", icon="GREASEPENCIL", text="")
+        operator['name'] = item.name
+        operator.room_datapath = item.path_from_id()
+        layout.label(text=item.name)
 
 
 class Smithy2D_SceneUIList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.prop(item, "name", text="", emboss=False)
+        operator = layout.operator("smithy2d.scene_renamer", icon="GREASEPENCIL", text="")
+        operator['name'] = item.name
+        operator.scene_datapath = item.path_from_id()
+        layout.label(text=item.name)
 
 
 class Smithy2D_ME_PT_Scenes(bpy.types.Panel):
@@ -107,7 +154,7 @@ class Smithy2D_ME_PT_Scenes(bpy.types.Panel):
     
     @classmethod
     def poll(cls, context):
-        return context.space_data and context.space_data.image
+        return context.space_data
 
     def draw(self, context):
         layout = self.layout
@@ -125,12 +172,19 @@ class Smithy2D_ME_PT_Scenes(bpy.types.Panel):
         list_action_col = list_row.column(align=True)
         draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'ADD', 'ADD')
         draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'REMOVE', 'REMOVE')
-        list_action_col.separator()
 
         if len(context.scene.smithy2d.scenes) > 1:
             draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'UP', 'TRIA_UP')
             draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'DOWN', 'TRIA_DOWN')
         
+        list_action_col.separator()
+        smithy_scene = context.scene.smithy2d.get_active_scene()
+        assetpath = scene_dir_assetpath(smithy_scene.name) if smithy_scene else scene_dir_assetpath("_")
+        scene_path = asset_abspath(assetpath) 
+        list_action_col.operator("smithy2d.show_path_in_explorer", icon="FILEBROWSER", text="").path = scene_path
+
+        if not bpy.data.filepath:
+            layout.enabled = False
 
 class Smithy2D_ME_PT_SceneRooms(bpy.types.Panel):
     bl_space_type = 'IMAGE_EDITOR'
@@ -141,10 +195,11 @@ class Smithy2D_ME_PT_SceneRooms(bpy.types.Panel):
     
     @classmethod
     def poll(cls, context):
-        return context.space_data and context.space_data.image and context.scene.smithy2d.get_active_scene()
+        return context.space_data and context.scene.smithy2d.get_active_scene()
 
     def draw_header(self, context):
-        self.layout.prop(context.space_data.image.smithy2d, "is_map", text="")
+        if context.space_data.image:
+            self.layout.prop(context.space_data.image.smithy2d, "is_map", text="")
 
     def draw(self, context):
         layout = self.layout
@@ -163,17 +218,23 @@ class Smithy2D_ME_PT_SceneRooms(bpy.types.Panel):
         list_action_col = list_row.column(align=True)
         draw_list_action("lexlistaction.smithy2d_room_list_action", list_action_col, 'ADD', 'ADD')
         draw_list_action("lexlistaction.smithy2d_room_list_action", list_action_col, 'REMOVE', 'REMOVE')
-        list_action_col.separator()
 
         if len(smithy_scene.rooms) > 1:
             draw_list_action("lexlistaction.smithy2d_room_list_action", list_action_col, 'UP', 'TRIA_UP')
             draw_list_action("lexlistaction.smithy2d_room_list_action", list_action_col, 'DOWN', 'TRIA_DOWN')
-
+        
+        list_action_col.separator()
         room = smithy_scene.get_active_room()
+        assetpath = room_dir_assetpath(smithy_scene.name, room.name) if room else scene_dir_assetpath(smithy_scene.name)
+        room_path = asset_abspath(assetpath)
+        list_action_col.operator("smithy2d.show_path_in_explorer", icon="FILEBROWSER", text="").path = room_path
+        
         if room:
             layout.prop(room, "location", text="Position")
             layout.prop(room, "size", text="Size")
 
+        if not bpy.data.filepath:
+            layout.enabled = False
 
 class Smithy2D_ME_PT_SceneRoomVariants(bpy.types.Panel):
     bl_space_type = 'IMAGE_EDITOR'
@@ -186,16 +247,13 @@ class Smithy2D_ME_PT_SceneRoomVariants(bpy.types.Panel):
     def poll(cls, context):
         smithy_scene = context.scene.smithy2d.get_active_scene()
         return (context.space_data 
-            and context.space_data.image
             and smithy_scene
             and smithy_scene.active_room_index >= 0 
             and smithy_scene.rooms)
 
-
     def draw(self, context):
         layout = self.layout
         smithy_scene = context.scene.smithy2d.get_active_scene()
-
         room = smithy_scene.get_active_room()
 
         def draw_list_action(list_idname, action_col, action, icon):
@@ -203,7 +261,7 @@ class Smithy2D_ME_PT_SceneRoomVariants(bpy.types.Panel):
             op.action = action
 
         list_row = layout.row()
-        list_row.template_list("Smithy2D_RoomUIList", "SmithyRoomVariants",
+        list_row.template_list("Smithy2D_VariantUIList", "SmithyRoomVariants",
                                 room, "variants",
                                 room, "active_variant_index",
                                 rows=3)
@@ -211,16 +269,23 @@ class Smithy2D_ME_PT_SceneRoomVariants(bpy.types.Panel):
         list_action_col = list_row.column(align=True)
         draw_list_action("lexlistaction.smithy2d_roomvariant_list_action", list_action_col, 'ADD', 'ADD')
         draw_list_action("lexlistaction.smithy2d_roomvariant_list_action", list_action_col, 'REMOVE', 'REMOVE')
-        list_action_col.separator()
 
         if len(room.variants) > 1:
             draw_list_action("lexlistaction.smithy2d_roomvariant_list_action", list_action_col, 'UP', 'TRIA_UP')
             draw_list_action("lexlistaction.smithy2d_roomvariant_list_action", list_action_col, 'DOWN', 'TRIA_DOWN')
+            
+        list_action_col.separator()
+        variant = room.get_active_variant()
+        assetpath = room_script_assetpath(smithy_scene.name, room.name, variant.name) if variant else room_dir_assetpath(smithy_scene.name, room.name)
+        variant_path = asset_abspath(assetpath)
+        list_action_col.operator("smithy2d.show_path_in_explorer", icon="FILEBROWSER", text="").path = variant_path
 
         if room.variants:
             layout.operator('smithy2d.edit_selected_room_script', text="Edit Script")
         layout.separator()
 
+        if not bpy.data.filepath:
+            layout.enabled = False
 
 def register():
     pass
