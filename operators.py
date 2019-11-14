@@ -257,14 +257,18 @@ class VariantRenameOperator(bpy.types.Operator):
         self.layout.prop(self, "name", text="Name")
 
     def execute(self, context):
-        variant = context.scene.path_resolve(self.variant_datapath)
-        if self.name == variant.name:
+        if not self.room_datapath:
+            self.report({"ERROR"}, "No room datapath? name: '{}'".format(self.name))
             return {"FINISHED"}
+        
+        variant = context.scene.path_resolve(self.variant_datapath)
        
         # validate the name
         if not self.name:
             self.is_valid = False
             self.warning = "Please type something"
+        elif self.name == variant.name:
+            return {"FINISHED"}
         elif self.force:
             variant.set_name(self.name)
             refresh_screen_area(context.area.type)
@@ -336,14 +340,18 @@ class RoomRenameOperator(bpy.types.Operator):
         self.layout.prop(self, "name", text="Name")
 
     def execute(self, context):
-        room = context.scene.path_resolve(self.room_datapath)
-        if self.name == room.name:
+        if not self.room_datapath:
+            self.report({"ERROR"}, "No room datapath? name: '{}'".format(self.name))
             return {"FINISHED"}
+        
+        room = context.scene.path_resolve(self.room_datapath)
         
         # validate the name
         if not self.name:
             self.is_valid = False
             self.warning = "Please type something"
+        elif self.name == room.name:
+            return {"FINISHED"}
         elif self.force:
             room.set_name(self.name)
             refresh_screen_area(context.area.type)
@@ -414,13 +422,16 @@ class SceneRenameOperator(bpy.types.Operator):
         self.layout.prop(self, "name", text="Name")
 
     def execute(self, context):
-        scene = context.scene.path_resolve(self.scene_datapath)
-        if self.name == scene.name:
+        if not self.scene_datapath:
+            self.report({"ERROR"}, "No scene datapath? name: '{}'".format(self.name))
             return {"FINISHED"}
-        
+
+        scene = context.scene.path_resolve(self.scene_datapath)
         if not self.name:
             self.is_valid = False
             self.warning = "Please type something"
+        elif self.name == scene.name:
+            return {"FINISHED"}
         elif self.force:
             scene.set_name(self.name)
             refresh_screen_area(context.area.type)
@@ -483,12 +494,18 @@ class VariantDeleterOperator(bpy.types.Operator):
         col.separator()
 
     def execute(self, context):
+        if not self.datapath:
+            self.report({"ERROR"}, "No variant datapath?")
+            return {"FINISHED"}
+        
         variant = context.scene.path_resolve(self.datapath)
         room = variant.get_room()
         scene = room.get_scene()
         variant_assetpath = room_script_assetpath(scene.name, room.name, variant.name)
         self.warning = ""
-        
+        if not valid_variant_assetpath(variant_assetpath):
+            self.force = True
+
         print("Deleting variant '{}'".format(variant))
         try:
             # delete from disk
@@ -518,12 +535,10 @@ class VariantDeleterOperator(bpy.types.Operator):
             return context.window_manager.invoke_props_dialog(self, width=360)
         except InvalidDeleteException as e:
             traceback.print_exc()
-            self.warning = "TRIED TO DELETE CORE, check the log"
-            return context.window_manager.invoke_props_dialog(self, width=360)
+            self.report({"ERROR"}, "TRIED TO DELETE CORE, check the log")
         except Exception as e:
             traceback.print_exc()
-            self.warning = "Something went wrong, check the log"
-            return context.window_manager.invoke_props_dialog(self, width=360)
+            self.report({"ERROR"}, "Something went wrong, check the log")
         return {"FINISHED"}
 
     def invoke(self, context, event):
@@ -558,10 +573,16 @@ class RoomDeleterOperator(bpy.types.Operator):
         col.separator()
 
     def execute(self, context):
+        if not self.datapath:
+            self.report({"ERROR"}, "No room datapath?")
+            return {"FINISHED"}
+
         room = context.scene.path_resolve(self.datapath)
         scene = room.get_scene()
         room_assetpath = room_dir_assetpath(scene.name, room.name)
         self.warning = ""
+        if not valid_room_assetpath(room_assetpath):
+            self.force = True
 
         print("Deleting room '{}'".format(room))
         try:
@@ -594,12 +615,10 @@ class RoomDeleterOperator(bpy.types.Operator):
             return context.window_manager.invoke_props_dialog(self, width=360)
         except InvalidDeleteException as e:
             traceback.print_exc()
-            self.warning = "TRIED TO DELETE CORE, check the log"
-            return context.window_manager.invoke_props_dialog(self, width=360)
+            self.report({"ERROR"}, "TRIED TO DELETE CORE, check the log")
         except Exception as e:
             traceback.print_exc()
-            self.warning = "Something went wrong, check the log"
-            return context.window_manager.invoke_props_dialog(self, width=360)
+            self.report({"ERROR"}, "Something went wrong, check the log")
         return {"FINISHED"}
 
     def invoke(self, context, event):
@@ -629,9 +648,16 @@ class SceneDeleterOperator(bpy.types.Operator):
         col.separator()
 
     def execute(self, context):
+        if not self.datapath:
+            self.report({"ERROR"}, "No scene datapath?")
+            return {"FINISHED"}
+
         smithy_scene = context.scene.path_resolve(self.datapath)
         scene_assetpath = scene_dir_assetpath(smithy_scene.name)
         self.warning = ""
+        if not valid_scene_assetpath(scene_assetpath):
+            self.force = True
+
         print("Deleting scene '{}'".format(smithy_scene))
         try:
             # delete from disk
@@ -663,12 +689,10 @@ class SceneDeleterOperator(bpy.types.Operator):
             return context.window_manager.invoke_props_dialog(self, width=360)
         except InvalidDeleteException as e:
             traceback.print_exc()
-            self.warning = "TRIED TO DELETE CORE, check the log"
-            return context.window_manager.invoke_props_dialog(self, width=360)
+            self.report({"ERROR"}, "TRIED TO DELETE CORE, check the log")
         except Exception as e:
             traceback.print_exc()
-            self.warning = "Something went wrong, check the log"
-            return context.window_manager.invoke_props_dialog(self, width=360)
+            self.report({"ERROR"}, "Something went wrong, check the log")
         return {"FINISHED"}
 
     def invoke(self, context, event):

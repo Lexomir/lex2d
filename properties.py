@@ -65,6 +65,12 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
                 sc = self.components_serialized.add()
                 sc.serialize(c)
 
+        def flatten(mat):
+            dim = len(mat)
+            return [mat[j][i] for i in range(dim) 
+                            for j in range(dim)]
+        self.matrix_local = flatten(obj.matrix_local)
+
         self.location = obj.location
         self.topleft = ObjUtils.BoundingBox(obj).get_bottombackleft() # bottom back left of the raw data (not scaled)
         self.rotation_quaternion = obj.rotation_quaternion
@@ -84,22 +90,17 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
             new_sc.deserialize(bpy_c)
             component_system.refresh_inputs(scene, room, bpy_c)
 
+        obj.matrix_local = self.matrix_local
+        obj.parent = bpy.data.objects.get(self.parent)
+        
         if obj.type == "MESH":
             # find the delta vertex movement of object (compare the top left bounding box of both states)
             bounds = ObjUtils.BoundingBox(obj)
-            tl = obj.location + multiply_vec3(bounds.get_bottombackleft(), obj.scale)
-            new_tl = Vector(self.location) + multiply_vec3(self.topleft, self.scale)
+            tl = bounds.get_bottombackleft()
+            new_tl = Vector(self.topleft)
             vert_move_amt = new_tl - tl
             # shift the object (in order to move it's verts in the right spot), then set the object's origin
-            obj.location += vert_move_amt
-            obj.scale = self.scale
-            ObjUtils.set_origin(obj, Vector(self.location))
-        else:
-            obj.scale = self.scale
-            obj.location = self.location
-
-        obj.rotation_quaternion = self.rotation_quaternion
-        obj.parent = bpy.data.objects.get(self.parent)
+            ObjUtils.shift_verts(obj, vert_move_amt)
 
     def store_data(self, identifier, str_data):
         data = self.custom_state_data.get(identifier)
@@ -119,16 +120,20 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
     location : bpy.props.FloatVectorProperty(size=3)
     topleft : bpy.props.FloatVectorProperty(size=3)
     scale : bpy.props.FloatVectorProperty(size=3)
+    rotation_quaternion : bpy.props.FloatVectorProperty(size=4)
+    matrix_local : bpy.props.FloatVectorProperty(
+        name="Matrix",
+        size=16,
+        subtype="MATRIX")
     dimensions : bpy.props.FloatVectorProperty(size=3)
     bounds : bpy.props.PointerProperty(type=ObjUtils.BpyBoundingBox)
-    rotation_quaternion : bpy.props.FloatVectorProperty(size=4)
     parent : bpy.props.StringProperty(default="")
     obj_type : bpy.props.StringProperty(default="MESH")
 
 class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
     def __str__(self):
         room = self.get_room()
-        return "{}:{}:{}".format(room.get_scene().name, room.name, self.name)
+        return "{}:{}:{}".format(room.get_scene().name or "_", room.name or "_", self.name or "_")
         
     def get_unique_name(self, name):
         room = self.get_room()
@@ -218,7 +223,7 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
         return self
 
     def __str__(self):
-        return "{}:{}".format(self.get_scene().name, self.name)
+        return "{}:{}".format(self.get_scene().name or "_", self.name or "_")
 
     def get_unique_name(self, name):
         scene = self.get_scene()
@@ -329,11 +334,10 @@ class Smithy2D_Object(bpy.types.PropertyGroup):
 class Smithy2D_Image(bpy.types.PropertyGroup):
     is_map : bpy.props.BoolProperty(default=False)
 
-
 SMITHY2D_INVALID_ID = 0
 class Smithy2D_Scene(bpy.types.PropertyGroup):
     def __str__(self):
-        return self.name
+        return self.name or "_"
         
     def init(self, name):
         name = self.get_unique_name(name)
@@ -418,7 +422,6 @@ class Smithy2D_Scene(bpy.types.PropertyGroup):
     active_room_index : bpy.props.IntProperty(default=-1, get=get_room, set=set_room_and_update)
     map_image : bpy.props.StringProperty()
 
-
 def _scene_changed(old_scene, new_scene):
         old_room = old_scene.get_active_room() if old_scene else None
         old_variant = old_room.get_active_variant() if old_room else None
@@ -457,7 +460,6 @@ class Smithy2D_ScenePropertyGroup(bpy.types.PropertyGroup):
 
     active_scene_index : bpy.props.IntProperty(set=set_scene_and_update, get=get_scene)
     scenes : bpy.props.CollectionProperty(type=Smithy2D_Scene)
-
 
 
 def register():

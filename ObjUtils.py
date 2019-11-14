@@ -5,16 +5,39 @@ import mathutils
 def get_bounds(obj):
     return BoundingBox(obj)
 
+def shift_verts(obj, move_amt):
+    me = obj.data
+    if me.is_editmode:
+        bm = bmesh.from_edit_mesh(me)
+    else:
+        bm = bmesh.new()
+        bm.from_mesh(me)
+    for v in bm.verts:
+        v.co += move_amt
+    if bm.is_wrapped:
+        bmesh.update_edit_mesh(me, False, False)
+    else:
+        bm.to_mesh(me)
+        me.update()
+
 def set_origin(obj, origin):
-    offset = origin - obj.location
-    offset = mathutils.Vector([offset[0] / obj.scale[0], offset[1] / obj.scale[1], offset[2] / obj.scale[2]])
-    bm = bmesh.new()
-    bm.from_mesh(obj.data)
+    loc, rot, scale = obj.matrix_local.decompose()
+    offset = origin - loc
+    offset = mathutils.Vector([offset[0] / scale[0], offset[1] / scale[1], offset[2] / scale[2]])
+    me = obj.data
+    if me.is_editmode:
+        bm = bmesh.from_edit_mesh(me)
+    else:
+        bm = bmesh.new()
+        bm.from_mesh(me)
     for v in bm.verts:
         v.co -= offset
-    bm.to_mesh(obj.data)
-    obj.data.update()
-    obj.location = origin
+    if bm.is_wrapped:
+        bmesh.update_edit_mesh(me, False, False)
+    else:
+        bm.to_mesh(me)
+        me.update()
+    obj.matrix_local.translation = origin
 
 
 class BoundingBoxBase:

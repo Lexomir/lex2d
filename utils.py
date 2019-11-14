@@ -454,3 +454,28 @@ def scene_dir_assetpath(scene_name):
 
 def room_scriptpath(scene_name, room_name, variant_name):
     return asset_scriptpath(room_script_assetpath(scene_name, room_name, variant_name))
+
+def valid_scene_assetpath(assetpath):
+    asset_normpath = os.path.normpath(assetpath)
+    path_parts = asset_normpath.split(os.sep)
+    valid = (len(path_parts) == 2 
+        and path_parts[0].lower() == "scripts" 
+        and path_parts[1].lower() != "core")
+    return valid
+
+def valid_room_assetpath(assetpath):
+    asset_normpath = os.path.normpath(assetpath)
+    path_parts = asset_normpath.split(os.sep)
+    valid = (len(path_parts) == 3 
+        and path_parts[0].lower() == "scripts" 
+        and path_parts[1].lower() != "core")
+    return valid
+
+def valid_variant_assetpath(assetpath):
+    asset_normpath = os.path.normpath(assetpath)
+    path_parts = asset_normpath.split(os.sep)
+    valid = (len(path_parts) == 5 
+        and path_parts[0].lower() == "scripts" 
+        and path_parts[3].lower() == "states" 
+        and path_parts[1].lower() != "core")
+    return valid

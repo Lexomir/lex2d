@@ -36,16 +36,17 @@ def serialize_obj_state(obj_state, line_prefix):
     # transform component
     serialized_state += "{}\t\t[\"{}\"] = {{\n".format(line_prefix, component_idpath(global_component_assetpath("Transform")))
 
+    loc, rot, scale = obj_state.matrix_local.decompose()
     mesh_size =  obj_state.bounds.get_dimensions()
     pivotpos_from_topleft = Vector(obj_state.topleft) * -1
     pivotpos_from_topleft_normalized = [a / b if b != 0 else a for a,b in zip(pivotpos_from_topleft, mesh_size)]
     pivotpos_from_topleft_normalized[1] *= -1  # invert y because topleft coordinate system
     transform_inputs = [
-        ('position', 'vec3', [round(v, 3) for v in convert_to_screen_position(obj_state.location)]), 
+        ('position', 'vec3', [round(v, 3) for v in convert_to_screen_position(loc)]), 
         ('pivot', 'vec3', [round(v, 3) for v in pivotpos_from_topleft_normalized]), 
-        ('rotation_quat', 'vec4', [round(v, 3) for v in obj_state.rotation_quaternion]), 
+        ('rotation_quat', 'vec4', [round(v, 3) for v in rot]), 
         ('size', 'vec4', [round(v, 3) for v in convert_to_screen_size(mesh_size)]), 
-        ('scale', 'vec3', [round(v, 3) for v in obj_state.scale])]
+        ('scale', 'vec3', [round(v, 3) for v in scale])]
     for i_n, i_t, i_v in transform_inputs:
         serialized_state += "{}\t\t\t[\"{}\"]={},\n".format(line_prefix, i_n, convert_to_lua_value(i_t, i_v))
 
