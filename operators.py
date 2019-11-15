@@ -1,5 +1,7 @@
 import bpy
 import os
+import uuid
+import uuid
 import shutil
 import bmesh
 import subprocess
@@ -7,7 +9,6 @@ import traceback
 import mathutils
 from .utils import *
 from . import ObjUtils
-
 
 
 class SetTextureFromFileBrowser(bpy.types.Operator):
@@ -185,6 +186,191 @@ class Smithy2D_OpenInExplorer(bpy.types.Operator):
 
     path : bpy.props.StringProperty()
 
+class Smithy2D_VariantAddOperator(bpy.types.Operator):
+    bl_idname = "smithy2d.variant_adder"
+    bl_label = "Add Variant"
+    bl_property = "variant_name"
+    bl_options = {"REGISTER"}
+
+    def draw(self, context):
+        layout = self.layout
+        if self.warning:
+            layout.label(text=self.warning)
+        layout.prop(self, "variant_name", text="Name")
+
+    def execute(self, context):
+        self.warning = ""
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room() if scene else None
+        if not room:
+            self.report({"ERROR"}, "Can't create variant. No room is active.")
+            return {"CANCELLED"}
+
+        variant_assetpath = room_script_assetpath(scene.name, room.name, self.variant_name)
+        if not self.variant_name:
+            self.warning = "Please type something"
+            return context.window_manager.invoke_props_dialog(self)
+        elif os.path.exists(asset_abspath(variant_assetpath)):
+            self.warning = "There is already a variant file with that name" 
+            return context.window_manager.invoke_props_dialog(self)
+        else:
+            variant = room.variants.add()
+            variant.init(self.variant_name)
+            variant_guid = "{}\t{}\n".format(variant.guid, variant_assetpath)
+
+            # add guids to guid file
+            guid_filepath = get_guid_mapfile()
+            with open(guid_filepath, "a") as guid_file:
+                guid_file.write(variant_guid)
+
+            if variant and self.duplicate:
+                variant.save_scene_state(bpy.context.scene)
+
+            room.set_variant_and_update(len(room.variants) - 1)
+            refresh_screen_area(context.area.type)
+        return {"FINISHED"}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def update_name(self, context):
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room()
+        variant_assetpath = room_script_assetpath(scene.name, room.name, self.variant_name)
+        if not valid_variant_assetpath(variant_assetpath):
+            self.warning = "Invalid variant name"
+        elif os.path.exists(asset_abspath(variant_assetpath)):
+            self.warning = "There is already a variant file with that name" 
+        return 
+
+    duplicate : bpy.props.BoolProperty(default=False)
+    warning : bpy.props.StringProperty()
+    variant_name : bpy.props.StringProperty(update=update_name)
+
+class Smithy2D_RoomAddOperator(bpy.types.Operator):
+    bl_idname = "smithy2d.room_adder"
+    bl_label = "Add Room"
+    bl_property = "room_name"
+    bl_options = {"REGISTER"}
+
+    def draw(self, context):
+        layout = self.layout
+        if self.warning:
+            layout.label(text=self.warning)
+        layout.prop(self, "room_name", text="Name")
+
+    def execute(self, context):
+        self.warning = ""
+        scene = context.scene.smithy2d.get_active_scene()
+        if not scene:
+            self.report({"ERROR"}, "Can't create room. No scene is active.")
+            return {"CANCELLED"}
+
+        room_assetpath = room_dir_assetpath(scene.name, self.room_name)
+        if not self.room_name:
+            self.warning = "Please type something"
+            return context.window_manager.invoke_props_dialog(self)
+        elif os.path.exists(asset_abspath(room_assetpath)):
+            self.warning = "There is already a scene directory with that name" 
+            return context.window_manager.invoke_props_dialog(self)
+        else:
+            room = scene.rooms.add()
+            room.init(self.room_name)
+            room_guids = ["{}\t{}\n".format(room.guid, room_assetpath)]
+            for variant in room.variants:
+                variant_assetpath = room_script_assetpath(scene.name, room.name, variant.name)
+                room_guids.append("{}\t{}\n".format(variant.guid, variant_assetpath))
+
+            # add guids to guid file
+            guid_filepath = get_guid_mapfile()
+            with open(guid_filepath, "a") as guid_file:
+                guid_file.writelines(room_guids)
+
+            variant = room.get_active_variant() 
+            if variant and self.duplicate:
+                variant.save_scene_state(bpy.context.scene)
+
+            scene.set_room_and_update(len(scene.rooms) - 1)
+            refresh_screen_area(context.area.type)
+        return {"FINISHED"}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def update_name(self, context):
+        context.scene.smithy2d.get_active_scene()
+        room_assetpath = room_dir_assetpath(scene.name, self.room_name)
+        if not valid_room_assetpath(room_assetpath):
+            self.warning = "Invalid room name"
+        elif os.path.exists(asset_abspath(room_assetpath)):
+            self.warning = "There is already a room directory with that name" 
+        return 
+
+    duplicate : bpy.props.BoolProperty(default=False)
+    warning : bpy.props.StringProperty()
+    room_name : bpy.props.StringProperty(update=update_name)
+
+class Smithy2D_SceneAddOperator(bpy.types.Operator):
+    bl_idname = "smithy2d.scene_adder"
+    bl_label = "Add Scene"
+    bl_property = "scene_name"
+    bl_options = {"REGISTER"}
+
+    def draw(self, context):
+        layout = self.layout
+        if self.warning:
+            layout.label(text=self.warning)
+        layout.prop(self, "scene_name", text="Name")
+
+    def execute(self, context):
+        self.warning = ""
+        scene_assetpath = scene_dir_assetpath(self.scene_name)
+        if not self.scene_name:
+            self.warning = "Please type something"
+            return context.window_manager.invoke_props_dialog(self)
+        elif os.path.exists(asset_abspath(scene_assetpath)):
+            self.warning = "There is already a scene directory with that name" 
+            return context.window_manager.invoke_props_dialog(self)
+        else:
+            scene = context.scene.smithy2d.scenes.add()
+            scene.init(self.scene_name)
+            scene_guids = ["{}\t{}\n".format(scene.guid, scene_assetpath)]
+            for room in scene.rooms:
+                room_assetpath = room_dir_assetpath(scene.name, room.name)
+                scene_guids.append("{}\t{}\n".format(room.guid, room_assetpath))
+                for variant in room.variants:
+                    variant_assetpath = room_script_assetpath(scene.name, room.name, variant.name)
+                    scene_guids.append("{}\t{}\n".format(variant.guid, variant_assetpath))
+
+            # add guids to guid file
+            guid_filepath = get_guid_mapfile()
+            with open(guid_filepath, "a") as guid_file:
+                guid_file.writelines(scene_guids)
+
+            room = scene.get_active_room() 
+            variant = room.get_active_variant() if room else None
+            if variant and self.duplicate:
+                variant.save_scene_state(bpy.context.scene)
+
+            context.scene.smithy2d.set_scene_and_update(len(context.scene.smithy2d.scenes) - 1)
+            refresh_screen_area(context.area.type)
+        return {"FINISHED"}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+    
+    def update_name(self, context):
+        scene_assetpath = scene_dir_assetpath(self.scene_name)
+        if not valid_scene_assetpath(scene_assetpath):
+            self.warning = "Invalid scene name"
+        elif os.path.exists(asset_abspath(scene_assetpath)):
+            self.warning = "There is already a scene directory with that name" 
+        return 
+
+    duplicate : bpy.props.BoolProperty(default=False)
+    warning : bpy.props.StringProperty()
+    scene_name : bpy.props.StringProperty(update=update_name)
+
 def rename_room_directory(scene_name, old_name, name):
     try:
         print("Renaming room directory '{}' to '{}'".format(old_name, name))
@@ -197,6 +383,18 @@ def rename_room_directory(scene_name, old_name, name):
         else:
             print("Smithy2D - Warning: Renaming a room but the original directory could not be found ('{}')".format(old_room_dir_abspath))
             os.makedirs(new_room_dir_abspath)
+        
+        # rename the room and its assets in the guid file
+        guid_map_filepath = get_guid_mapfile()
+        tmp_guid_map_filepath = guid_map_filepath + ".tmp"
+        with open(guid_map_filepath, "r") as guid_file:
+            with open(tmp_guid_map_filepath, "w") as tmp_guid_file:
+                for line in guid_file:
+                    line_assetpath = line.split('\t')[1].rstrip()
+                    if line_assetpath.startswith(old_room_dir_assetpath):
+                        line = line.replace(old_room_dir_assetpath, new_room_dir_assetpath, 1)
+                    tmp_guid_file.write(line)
+        os.replace(tmp_guid_map_filepath, guid_map_filepath)
         return True
     except Exception as e:
         traceback.print_exc()
@@ -214,6 +412,18 @@ def rename_variant_script(scene_name, room_name, old_variant_name, new_variant_n
             os.rename(old_script_filepath, new_script_filepath)
         else:
             print("Smithy2D - Warning: Renaming a Variant but the original script could not be found ('{}')".format(old_script_filepath))
+
+        # rename the variant
+        guid_map_filepath = get_guid_mapfile()
+        tmp_guid_map_filepath = guid_map_filepath + ".tmp"
+        with open(guid_map_filepath, "r") as guid_file:
+            with open(tmp_guid_map_filepath, "w") as tmp_guid_file:
+                for line in guid_file:
+                    line_assetpath = line.split('\t')[1].rstrip()
+                    if line_assetpath.startswith(old_script_assetpath):
+                        line = line.replace(old_script_assetpath, new_script_assetpath, 1)
+                    tmp_guid_file.write(line)
+        os.replace(tmp_guid_map_filepath, guid_map_filepath)
         return True
     except:
         return False
@@ -230,6 +440,18 @@ def rename_scene(old_scene_name, new_scene_name):
             os.rename(old_scene_dir_abspath, new_scene_abspath)
         else:
             print("Smithy2D - Warning: Renaming a Scene but the original directory could not be found ('{}')".format(old_scene_dir_abspath))
+        
+        # rename the scene and its assets in the guid file
+        guid_map_filepath = get_guid_mapfile()
+        tmp_guid_map_filepath = guid_map_filepath + ".tmp"
+        with open(guid_map_filepath, "r") as guid_file:
+            with open(tmp_guid_map_filepath, "w") as tmp_guid_file:
+                for line in guid_file:
+                    line_assetpath = line.split('\t')[1].rstrip()
+                    if line_assetpath.startswith(old_scene_dir_assetpath):
+                        line = line.replace(old_scene_dir_assetpath, new_scene_assetpath, 1)
+                    tmp_guid_file.write(line)
+        os.replace(tmp_guid_map_filepath, guid_map_filepath)
         return True
     except:
         return False
@@ -241,9 +463,6 @@ class VariantRenameOperator(bpy.types.Operator):
     bl_property = "name"
 
     def draw(self, context):
-        if self.force:
-            self.layout.label(text="Remap Mode")
-
         if not self.is_valid:
             row = self.layout.row()
             variant = context.scene.path_resolve(self.variant_datapath)
@@ -257,7 +476,7 @@ class VariantRenameOperator(bpy.types.Operator):
         self.layout.prop(self, "name", text="Name")
 
     def execute(self, context):
-        if not self.room_datapath:
+        if not self.variant_datapath:
             self.report({"ERROR"}, "No room datapath? name: '{}'".format(self.name))
             return {"FINISHED"}
         
@@ -268,10 +487,6 @@ class VariantRenameOperator(bpy.types.Operator):
             self.is_valid = False
             self.warning = "Please type something"
         elif self.name == variant.name:
-            return {"FINISHED"}
-        elif self.force:
-            variant.set_name(self.name)
-            refresh_screen_area(context.area.type)
             return {"FINISHED"}
         else:
             self.validate_name(context)
@@ -295,7 +510,6 @@ class VariantRenameOperator(bpy.types.Operator):
         sd = self.variant_datapath
         if not sd:
             print("OUCH")
-        self.force = event.shift
         return context.window_manager.invoke_props_dialog(self)
     
     def check_name_exists(self, context):
@@ -308,7 +522,7 @@ class VariantRenameOperator(bpy.types.Operator):
 
     def validate_name(self, context):
         variant = context.scene.path_resolve(self.variant_datapath)
-        if self.name and self.name != variant.name and not self.force:
+        if self.name and self.name != variant.name:
             self.is_valid = not VariantRenameOperator.check_name_exists(self, context)
             self.warning = "There is already a variant script with that name" 
 
@@ -316,7 +530,6 @@ class VariantRenameOperator(bpy.types.Operator):
     warning : bpy.props.StringProperty()
     is_valid : bpy.props.BoolProperty(default=True)
     variant_datapath : bpy.props.StringProperty() # data path from the underlying id_data
-    force : bpy.props.BoolProperty(default=False)
 
 class RoomRenameOperator(bpy.types.Operator):
     bl_idname = "smithy2d.room_renamer"
@@ -325,9 +538,6 @@ class RoomRenameOperator(bpy.types.Operator):
     bl_property = "name"
 
     def draw(self, context):
-        if self.force:
-            self.layout.label(text="Remap Mode")
-
         if not self.is_valid:
             row = self.layout.row()
             room = context.scene.path_resolve(self.room_datapath)
@@ -352,10 +562,6 @@ class RoomRenameOperator(bpy.types.Operator):
             self.warning = "Please type something"
         elif self.name == room.name:
             return {"FINISHED"}
-        elif self.force:
-            room.set_name(self.name)
-            refresh_screen_area(context.area.type)
-            return {"FINISHED"}
         else:
             self.validate_name(context)
         
@@ -374,10 +580,6 @@ class RoomRenameOperator(bpy.types.Operator):
         return {"FINISHED"}
 
     def invoke(self, context, event):
-        sd = self.room_datapath
-        if not sd:
-            print("OUCH")
-        self.force = event.shift
         return context.window_manager.invoke_props_dialog(self)
     
     def check_name_exists(self, context):
@@ -391,7 +593,7 @@ class RoomRenameOperator(bpy.types.Operator):
 
     def validate_name(self, context):
         room = context.scene.path_resolve(self.room_datapath)
-        if self.name and self.name != room.name and not self.force:
+        if self.name and self.name != room.name:
             self.is_valid = not RoomRenameOperator.check_name_exists(self, context)
             self.warning = "There is already a room directory with that name" 
 
@@ -399,7 +601,6 @@ class RoomRenameOperator(bpy.types.Operator):
     warning : bpy.props.StringProperty()
     is_valid : bpy.props.BoolProperty(default=True)
     room_datapath : bpy.props.StringProperty() # data path from the underlying id_data
-    force : bpy.props.BoolProperty(default=False)
 
 class SceneRenameOperator(bpy.types.Operator):
     bl_idname = "smithy2d.scene_renamer"
@@ -408,9 +609,6 @@ class SceneRenameOperator(bpy.types.Operator):
     bl_property = "name"
 
     def draw(self, context):
-        if self.force:
-            self.layout.label(text="Remap Mode")
-
         if not self.is_valid:
             row = self.layout.row()
             scene = context.scene.path_resolve(self.scene_datapath)
@@ -432,10 +630,6 @@ class SceneRenameOperator(bpy.types.Operator):
             self.warning = "Please type something"
         elif self.name == scene.name:
             return {"FINISHED"}
-        elif self.force:
-            scene.set_name(self.name)
-            refresh_screen_area(context.area.type)
-            return {"FINISHED"}
         else:
             self.validate_name(context)
 
@@ -453,10 +647,6 @@ class SceneRenameOperator(bpy.types.Operator):
         return {"FINISHED"}
 
     def invoke(self, context, event):
-        sd = self.scene_datapath
-        if not sd:
-            print("OUCH")
-        self.force = event.shift
         return context.window_manager.invoke_props_dialog(self)
     
     def check_name_exists(self, context):
@@ -467,14 +657,13 @@ class SceneRenameOperator(bpy.types.Operator):
 
     def validate_name(self, context):
         scene = context.scene.path_resolve(self.scene_datapath)
-        if not self.force and self.name and self.name != scene.name and not self.force:
+        if self.name and self.name != scene.name:
             self.is_valid = not SceneRenameOperator.check_name_exists(self, context)
             self.warning = "There is already a scene directory with that name" 
 
     name : bpy.props.StringProperty(update=validate_name, options={'TEXTEDIT_UPDATE'})
     warning : bpy.props.StringProperty()
     is_valid : bpy.props.BoolProperty(default=True)
-    force : bpy.props.BoolProperty(default=False)
     scene_datapath : bpy.props.StringProperty() # data path from the underlying id_data
 
 class VariantDeleterOperator(bpy.types.Operator):
@@ -487,9 +676,6 @@ class VariantDeleterOperator(bpy.types.Operator):
             self.layout.label(text=self.warning)
             self.layout.separator()
         col = self.layout.column(align = True)
-        if self.force:
-            col.label(text="Blendfile-only mode")
-            col.separator()
         col.label(text="Are you sure you want to delete this Variant?")
         col.separator()
 
@@ -502,14 +688,16 @@ class VariantDeleterOperator(bpy.types.Operator):
         room = variant.get_room()
         scene = room.get_scene()
         variant_assetpath = room_script_assetpath(scene.name, room.name, variant.name)
+        variant_guid = variant.guid
         self.warning = ""
+        asset_exists = True
         if not valid_variant_assetpath(variant_assetpath):
-            self.force = True
+            asset_exists = False
 
         print("Deleting variant '{}'".format(variant))
         try:
             # delete from disk
-            if not self.force:
+            if asset_exists:
                 archive_and_delete_asset(variant_assetpath)
             # delete from ui
             collection = room.variants
@@ -530,6 +718,19 @@ class VariantDeleterOperator(bpy.types.Operator):
                 # highlight and load the next scene
                 room.set_variant(new_active_idx)
                 room.load_variant(new_active_idx, force=True)
+            
+            # remove from guids mapfile
+            guid_map_filepath = get_guid_mapfile()
+            tmp_guid_map_filepath = guid_map_filepath + ".tmp"
+            if os.path.exists(guid_map_filepath):
+                with open(guid_map_filepath, "r") as guid_file:
+                    with open(tmp_guid_map_filepath, "w") as tmp_guid_file:
+                        for line in guid_file:
+                            if line.split('\t')[0] != variant_guid:
+                                tmp_guid_file.write(line)
+                os.replace(tmp_guid_map_filepath, guid_map_filepath)
+
+            refresh_screen_area(context.area.type)
         except OSError as e:
             self.warning = "Can't delete the Variant. It's being used by an external process"
             return context.window_manager.invoke_props_dialog(self, width=360)
@@ -542,12 +743,10 @@ class VariantDeleterOperator(bpy.types.Operator):
         return {"FINISHED"}
 
     def invoke(self, context, event):
-        self.force = event.shift
         return context.window_manager.invoke_props_dialog(self)
 
     datapath : bpy.props.StringProperty()
     warning : bpy.props.StringProperty()
-    force : bpy.props.BoolProperty(default=False)
 
 class RoomDeleterOperator(bpy.types.Operator):
     bl_idname = "smithy2d.room_deleter"
@@ -561,13 +760,9 @@ class RoomDeleterOperator(bpy.types.Operator):
 
         col = self.layout.column(align = True)
         #col.alignment = 'EXPAND'
-        if self.force:
-            col.label(text="Blendfile-only mode")
-            col.separator()
         if not self.warning:
             col.label(text="Are you sure you want to delete this Room?")
-            if not self.force:
-                col.label(text="(along with all of its variants and components)")
+            col.label(text="(along with all of its variants and components)")
         else:
             col.label(text="Try again?")
         col.separator()
@@ -580,14 +775,21 @@ class RoomDeleterOperator(bpy.types.Operator):
         room = context.scene.path_resolve(self.datapath)
         scene = room.get_scene()
         room_assetpath = room_dir_assetpath(scene.name, room.name)
+
+        # collect the rooms guids (to remove them from the guids file later)
+        room_guids = [room.guid]
+        for variant in room.variants:
+            room_guids.append(variant.guid)
+
         self.warning = ""
+        asset_exists = True
         if not valid_room_assetpath(room_assetpath):
-            self.force = True
+            asset_exists = False
 
         print("Deleting room '{}'".format(room))
         try:
             # delete from disk
-            if not self.force:
+            if asset_exists:
                 archive_and_delete_asset(room_assetpath)
 
             # delete from ui
@@ -610,6 +812,18 @@ class RoomDeleterOperator(bpy.types.Operator):
                 scene.set_room(new_active_idx)
                 scene.load_room(new_active_idx, force=True)
 
+            # remove from guids mapfile
+            guid_map_filepath = get_guid_mapfile()
+            tmp_guid_map_filepath = guid_map_filepath + ".tmp"
+            if os.path.exists(guid_map_filepath):
+                with open(guid_map_filepath, "r") as guid_file:
+                    with open(tmp_guid_map_filepath, "w") as tmp_guid_file:
+                        for line in guid_file:
+                            if line.split('\t')[0] not in room_guids:
+                                tmp_guid_file.write(line)
+                os.replace(tmp_guid_map_filepath, guid_map_filepath)                
+
+            refresh_screen_area(context.area.type)
         except OSError as e:
             self.warning = "Can't delete the Room. It's being used by an external process"
             return context.window_manager.invoke_props_dialog(self, width=360)
@@ -622,12 +836,10 @@ class RoomDeleterOperator(bpy.types.Operator):
         return {"FINISHED"}
 
     def invoke(self, context, event):
-        self.force = event.shift
         return context.window_manager.invoke_props_dialog(self)
 
     datapath : bpy.props.StringProperty()
     warning : bpy.props.StringProperty()
-    force : bpy.props.BoolProperty(default=False)
 
 class SceneDeleterOperator(bpy.types.Operator):
     bl_idname = "smithy2d.scene_deleter"
@@ -639,12 +851,8 @@ class SceneDeleterOperator(bpy.types.Operator):
             self.layout.label(text=self.warning)
             self.layout.separator()
         col = self.layout.column(align = True)
-        if self.force:
-            col.label(text="Blendfile-only mode")
-            col.separator()
         col.label(text="Are you sure you want to delete this scene?")
-        if not self.force:
-            col.label(text="(along with all of its rooms, variants, and components)")
+        col.label(text="(along with all of its rooms, variants, and components)")
         col.separator()
 
     def execute(self, context):
@@ -654,14 +862,23 @@ class SceneDeleterOperator(bpy.types.Operator):
 
         smithy_scene = context.scene.path_resolve(self.datapath)
         scene_assetpath = scene_dir_assetpath(smithy_scene.name)
+
+        # collect all scene guids (to remove them from the guid file later)
+        scene_guids = [smithy_scene.guid]
+        for room in smithy_scene.rooms:
+            scene_guids.append(room.guid)
+            for variant in room.variants:
+                scene_guids.append(variant.guid)
+
         self.warning = ""
+        asset_exists = True
         if not valid_scene_assetpath(scene_assetpath):
-            self.force = True
+            asset_exists = False
 
         print("Deleting scene '{}'".format(smithy_scene))
         try:
             # delete from disk
-            if not self.force:
+            if asset_exists:
                 archive_and_delete_asset(scene_assetpath)
 
             # delete from ui
@@ -683,6 +900,18 @@ class SceneDeleterOperator(bpy.types.Operator):
                 # highlight the previous scene and load its contents
                 context.scene.smithy2d.set_scene(new_active_idx)
                 context.scene.smithy2d.load_scene(new_active_idx, force=True)
+            
+            # remove from guids mapfile
+            guid_map_filepath = get_guid_mapfile()
+            tmp_guid_map_filepath = guid_map_filepath + ".tmp"
+            if os.path.exists(guid_map_filepath):
+                with open(guid_map_filepath, "r") as guid_file:
+                    with open(tmp_guid_map_filepath, "w") as tmp_guid_file:
+                        for line in guid_file:
+                            if line.split('\t')[0] not in scene_guids:
+                                tmp_guid_file.write(line)
+                os.replace(tmp_guid_map_filepath, guid_map_filepath)
+
             refresh_screen_area(context.area.type)
         except OSError as e:
             self.warning = "Can't delete the scene. It's being used by an external process"
@@ -701,7 +930,134 @@ class SceneDeleterOperator(bpy.types.Operator):
 
     datapath : bpy.props.StringProperty()
     warning : bpy.props.StringProperty()
-    force : bpy.props.BoolProperty(default=False)
+
+class SyncWithAssetFolder(bpy.types.Operator):
+    bl_idname = "smithy2d.sync_with_asset_folder"
+    bl_label = "Sync With Asset Folder"
+    bl_options = {"REGISTER"}
+
+    @classmethod
+    def poll(cls, context):
+        return bpy.data.filepath
+
+    def execute(self, context):
+        def create_guid():
+            return str(uuid.uuid4())
+
+        # sync existing assets with contents on disk
+        guid_map = {}
+        assetpath_map = {}
+        guid_map_filepath = get_guid_mapfile()
+        os.makedirs(os.path.dirname(guid_map_filepath), exist_ok=True)
+        file_access = "r+" if os.path.exists(guid_map_filepath) else "w+"
+        with open(guid_map_filepath, file_access) as guid_file:
+            # parse the guids from the guid-assetpath map file
+            for line in guid_file:
+                line_parts = line.split("\t")
+                guid, assetpath = line_parts[0], line_parts[1].rstrip()
+                guid_map[guid] = assetpath
+                assetpath_map[guid] = guid
+            
+            # rename each scene according to its mapped directories
+            for scene in context.scene.smithy2d.scenes:
+                current_assetpath = scene_dir_assetpath(scene.name)
+                if not scene.guid:
+                    if current_assetpath in assetpath_map:
+                        self.report({"ERROR"}, "This scene doesn't have a guid, but somehow its directory is in the guid mapfile.")
+                    scene.guid = create_guid()
+
+                # if no guid, this scene gets linked to the directory of its current name
+                new_assetpath = guid_map.get(scene.guid)
+                if not new_assetpath:
+                    new_assetpath = current_assetpath
+                    guid_file.write("{}\t{}\n".format(scene.guid, new_assetpath))
+                    guid_map[scene.guid] = new_assetpath
+                # set the scene's name according to its directory name
+                scene.name = scene_from_assetpath(new_assetpath)
+
+                # rename each room according to its mapped directories
+                for room in scene.rooms:
+                    current_assetpath = room_dir_assetpath(scene.name, room.name)
+                    if not room.guid:
+                        if current_assetpath in assetpath_map:
+                            self.report({"ERROR"}, "This room doesn't have a guid, but somehow its directory is in the guid mapfile.")
+                        room.guid = create_guid()
+
+                    # if no guid, this room gets linked to the directory of its current name
+                    new_assetpath = guid_map.get(room.guid)
+                    if not new_assetpath:
+                        new_assetpath = current_assetpath
+                        guid_file.write("{}\t{}\n".format(room.guid, new_assetpath))
+                        guid_map[room.guid] = new_assetpath
+                    # set the room's name according to its directory name
+                    room.name = room_from_assetpath(new_assetpath)
+
+                    # rename each variant according to its mapped script file
+                    for variant in room.variants:
+                        current_assetpath = room_script_assetpath(scene.name, room.name, variant.name)
+                        if not variant.guid:
+                            if current_assetpath in assetpath_map:
+                                self.report({"ERROR"}, "This variant doesn't have a guid, but somehow its script is in the guid mapfile.")
+                            variant.guid = create_guid()
+
+                        # if no guid, this variant gets linked to the file of its current name
+                        new_assetpath = guid_map.get(variant.guid)
+                        if not new_assetpath:
+                            new_assetpath = current_assetpath
+                            guid_file.write("{}\t{}\n".format(variant.guid, new_assetpath))
+                            guid_map[variant.guid] = new_assetpath
+                        # set the variant's name according to its script name
+                        variant.name = variant_from_assetpath(new_assetpath)
+
+            # find new assets on disk
+            scenes_dir = asset_abspath("scripts/")
+            for scene_name in os.listdir(scenes_dir):
+                if scene_name != "core" and os.path.isdir(os.path.join(scenes_dir, scene_name)):
+                    scene = context.scene.smithy2d.scenes.get(scene_name)
+                    scene_assetpath = scene_dir_assetpath(scene_name)
+                    scene_abspath = asset_abspath(scene_assetpath)
+                    # add scene if it doesnt exist in the blendfile
+                    if not scene:
+                        scene = context.scene.smithy2d.scenes.add()
+                        scene.name = scene_name
+                        scene.guid = assetpath_map.get(scene_assetpath) or ""
+                        if not scene.guid:
+                            scene.guid = create_guid()
+                            guid_file.write("{}\t{}\n".format(scene.guid, scene_assetpath))
+
+                    # find new room assets on disk
+                    for room_name in os.listdir(scene_abspath):
+                        if os.path.isdir(os.path.join(scene_abspath, room_name)):
+                            room = scene.rooms.get(room_name)
+                            room_assetpath = room_dir_assetpath(scene_name, room_name)
+                            room_abspath = asset_abspath(room_assetpath)
+                            # add room if it doesnt exist in the blendfile
+                            if not room:
+                                room = scene.rooms.add()
+                                room.name = room_name
+                                room.guid = assetpath_map.get(room_assetpath) or ""
+                                if not room.guid:
+                                    room.guid = create_guid()
+                                    guid_file.write("{}\t{}\n".format(room.guid, room_assetpath))
+
+                            # find new variant assets on disk
+                            variants_dir = os.path.join(room_abspath, "states")
+                            if os.path.exists(variants_dir) and os.path.isdir(variants_dir):
+                                for variant_filename in os.listdir(variants_dir):
+                                    variant_name, ext = os.path.splitext(variant_filename)
+                                    if ext == ".lua":
+                                        variant = room.variants.get(variant_name)
+                                        variant_assetpath = room_script_assetpath(scene_name, room_name, variant_name)
+                                        # add variant if it doesnt exist in the blendfile
+                                        if not variant:
+                                            variant = room.variants.add()
+                                            variant.name = variant_name
+                                            variant.guid = assetpath_map.get(variant_assetpath) or ""
+                                            if not variant.guid:
+                                                variant.guid = create_guid()
+                                                guid_file.write("{}\t{}\n".format(variant.guid, variant_assetpath))
+
+        return {"FINISHED"}
 
 
 def draw_item(self, context):

@@ -18,9 +18,6 @@ class Smithy2D_ComponentListAction(bpy.types.Operator, uibase.LexBaseListAction)
     def get_index_source(self):
         return bpy.context.object.smithy2d
 
-    def on_add(self, item):
-        pass
-
 
 class Smithy2D_ComponentUIList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):

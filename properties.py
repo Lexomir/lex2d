@@ -1,7 +1,9 @@
 import bpy
+import uuid
 from . import ecs, ObjUtils, dialog_system
 from .dialog_system import TEXT_INPUT_PADDING, DIALOG_PADDING, WIDGET_PADDING
 from .utils import *
+from mathutils import Matrix, Vector
 import time
 import sys
 from bpy.app.handlers import persistent
@@ -71,10 +73,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
                             for j in range(dim)]
         self.matrix_local = flatten(obj.matrix_local)
 
-        self.location = obj.location
         self.topleft = ObjUtils.BoundingBox(obj).get_bottombackleft() # bottom back left of the raw data (not scaled)
-        self.rotation_quaternion = obj.rotation_quaternion
-        self.scale = obj.scale
         self.bounds.set_from_object(obj)
         self.parent = obj.parent.name if obj.parent else ""
         self.obj_type = obj.type
@@ -90,6 +89,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
             new_sc.deserialize(bpy_c)
             component_system.refresh_inputs(scene, room, bpy_c)
 
+        obj.matrix_parent_inverse = Matrix()
         obj.matrix_local = self.matrix_local
         obj.parent = bpy.data.objects.get(self.parent)
         
@@ -115,12 +115,17 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
             return data.value
         return None
 
-    components_serialized : bpy.props.CollectionProperty(type=Smithy2D_SerializedComponent)
-    custom_state_data : bpy.props.CollectionProperty(type=Smithy2D_LexStringProperty)
+    # deprecated
     location : bpy.props.FloatVectorProperty(size=3)
-    topleft : bpy.props.FloatVectorProperty(size=3)
     scale : bpy.props.FloatVectorProperty(size=3)
     rotation_quaternion : bpy.props.FloatVectorProperty(size=4)
+    need_old_stuff : bpy.props.BoolProperty(default=True)
+
+    # properties
+    size : bpy.props.FloatVectorProperty(size=3)
+    components_serialized : bpy.props.CollectionProperty(type=Smithy2D_SerializedComponent)
+    custom_state_data : bpy.props.CollectionProperty(type=Smithy2D_LexStringProperty)
+    topleft : bpy.props.FloatVectorProperty(size=3)
     matrix_local : bpy.props.FloatVectorProperty(
         name="Matrix",
         size=16,
@@ -160,8 +165,8 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
     def init(self, name):
         room = self.get_room()
         scene = room.get_scene()
-
-        name = self.get_unique_name(name)
+        self.guid = str(uuid.uuid4())
+        name = get_unique_variant_name(scene.name, room.name, name)
         variant_script_filepath = asset_abspath(room_script_assetpath(scene.name, room.name, name))
         if not os.path.exists(variant_script_filepath) and create_room_script(scene.name, room.name, name):
             self.set_name(name)
@@ -203,19 +208,20 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
             assert prev_obj in bpy.data.objects
             move_backstage(bpy.data.objects.get(prev_obj))
 
-    name : bpy.props.StringProperty(get=get_name)
+    guid : bpy.props.StringProperty(default="")
+    name : bpy.props.StringProperty()
     object_states : bpy.props.CollectionProperty(type=Smithy2D_ObjectState)
 
 class Smithy2D_Room(bpy.types.PropertyGroup):
     def init(self, name):
-        name = self.get_unique_name(name)
         scene = self.get_scene()
+        name = get_unique_room_name(scene.name, name)
         room_dir_abspath = asset_abspath(room_dir_assetpath(scene.name, name))
+        self.guid = str(uuid.uuid4())
         if not os.path.exists(room_dir_abspath):
             self.set_name(name)
         else:
             print("ERROR: Setting room name to '{}', but there is already a directory at '{}'".format(name, room_dir_abspath))
-
         self.variants.add().init('Variant')
         self.set_variant(0)
         self.size = (.2, .2)
@@ -294,11 +300,12 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
                         (scene, room, variant))
         self['active_variant_index'] = index
 
+    guid : bpy.props.StringProperty(default="")
     location : bpy.props.FloatVectorProperty(size=2)
     size : bpy.props.FloatVectorProperty(size=2)
     variants : bpy.props.CollectionProperty(type=Smithy2D_RoomVariant)
     active_variant_index: bpy.props.IntProperty(default=-1, set=set_variant_and_update, get=get_variant)
-    name : bpy.props.StringProperty(get=get_name)
+    name : bpy.props.StringProperty()
 
 class Smithy2D_Object(bpy.types.PropertyGroup):
     def get_component(self, name):
@@ -340,8 +347,9 @@ class Smithy2D_Scene(bpy.types.PropertyGroup):
         return self.name or "_"
         
     def init(self, name):
-        name = self.get_unique_name(name)
+        name = get_unique_scene_name(name)
         scene_dir_abspath = asset_abspath(scene_dir_assetpath(name))
+        self.guid = str(uuid.uuid4())
         if not os.path.exists(scene_dir_abspath):
             self.set_name(name)
         else:
@@ -417,7 +425,8 @@ class Smithy2D_Scene(bpy.types.PropertyGroup):
     def get_map_image(self):
         return bpy.data.images.get(self.map_image)
 
-    name : bpy.props.StringProperty(get=get_name)
+    guid : bpy.props.StringProperty(default="")
+    name : bpy.props.StringProperty()
     rooms : bpy.props.CollectionProperty(type=Smithy2D_Room)
     active_room_index : bpy.props.IntProperty(default=-1, get=get_room, set=set_room_and_update)
     map_image : bpy.props.StringProperty()

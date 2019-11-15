@@ -418,7 +418,7 @@ def asset_abspath(assetpath):
     return "{}gamedata/assets/{}".format(bpy.path.abspath("//").replace('\\', '/'), assetpath)
 
 def asset_archive_abspath(assetpath):
-    return "{}.tmp/gamedata/assets/{}".format(bpy.path.abspath("//").replace('\\', '/'), assetpath)
+    return "{}.lexeditor/.tmp/gamedata/assets/{}".format(bpy.path.abspath("//").replace('\\', '/'), assetpath)
 
 def global_component_assetpath(component_name):
     return "scripts/core/components/{}.lua".format(component_name)
@@ -477,5 +477,72 @@ def valid_variant_assetpath(assetpath):
     valid = (len(path_parts) == 5 
         and path_parts[0].lower() == "scripts" 
         and path_parts[3].lower() == "states" 
-        and path_parts[1].lower() != "core")
+        and path_parts[1].lower() != "core"
+        and os.path.splitext(path_parts[4])[1] == ".lua")
     return valid
+
+def get_guid_mapfile():
+    return os.path.join(bpy.path.abspath("//"), ".lexeditor", "guids")
+
+def scene_from_assetpath(assetpath):
+    if valid_scene_assetpath(assetpath):
+        asset_normpath = os.path.normpath(assetpath)
+        path_parts = asset_normpath.split(os.sep)
+        return path_parts[1]
+    else:
+        return None
+
+def room_from_assetpath(assetpath):
+    if valid_room_assetpath(assetpath):
+        asset_normpath = os.path.normpath(assetpath)
+        path_parts = asset_normpath.split(os.sep)
+        return path_parts[2]
+    else:
+        return None
+
+def variant_from_assetpath(assetpath):
+    if valid_variant_assetpath(assetpath):
+        asset_normpath = os.path.normpath(assetpath)
+        path_parts = asset_normpath.split(os.sep)
+        return os.path.splitext(path_parts[4])[0]
+    else:
+        return None
+
+def get_unique_scene_name(scene_basename):
+    final_name = scene_basename
+    i = 0
+    found_name = False
+    while not found_name:
+        scene_dir_abspath = asset_abspath(scene_dir_assetpath(final_name))
+        if not os.path.exists(scene_dir_abspath):
+            found_name = True
+        else:  
+            i += 1
+            final_name = scene_basename + "_" + str(i)
+    return final_name
+
+def get_unique_room_name(scene_name, room_basename):
+    final_name = room_basename
+    i = 0
+    found_name = False
+    while not found_name:
+        room_dir_abspath = asset_abspath(room_dir_assetpath(scene_name, final_name))
+        if not os.path.exists(room_dir_abspath):
+            found_name = True
+        else:  
+            i += 1
+            final_name = room_basename + "_" + str(i)
+    return final_name
+
+def get_unique_variant_name(scene_name, room_name, variant_basename):
+    final_name = variant_basename
+    i = 0
+    found_name = False
+    while not found_name:
+        variant_script_filepath = asset_abspath(room_script_assetpath(scene_name, room_name, final_name))
+        if not os.path.exists(variant_script_filepath):
+            found_name = True
+        else:  
+            i += 1
+            final_name = variant_basename + "_" + str(i)
+    return final_name

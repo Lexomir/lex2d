@@ -30,15 +30,16 @@ class Smithy2D_ME_RoomListAction(bpy.types.Operator, uibase.LexBaseListAction):
         else:
             smithy_scene.set_room(index)
 
-    def on_add(self, item):
-        if self.shift:
-            bpy.ops.smithy2d.room_renamer('INVOKE_DEFAULT', room_datapath=item.path_from_id(), name="Room", force=True)
-        else:
-            item.init("Room")
+    def new_item(self):
+        scene = bpy.context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room()
+        unique_name = get_unique_room_name(scene.name, room.name) if room and self.shift else get_unique_room_name(scene.name, "Room")
+        execute_type = "INVOKE_DEFAULT" if not self.shift else "EXEC_DEFAULT"
+        bpy.ops.smithy2d.room_adder(execute_type, room_name=unique_name, duplicate=self.shift)
 
     def remove_item(self, item_idx):
         item = self.get_collection()[item_idx]
-        bpy.ops.smithy2d.room_deleter('INVOKE_DEFAULT', datapath=item.path_from_id(), force=self.shift)
+        bpy.ops.smithy2d.room_deleter('INVOKE_DEFAULT', datapath=item.path_from_id())
 
 
 class Smithy2D_ME_RoomVariantListAction(bpy.types.Operator, uibase.LexBaseListAction):
@@ -69,16 +70,17 @@ class Smithy2D_ME_RoomVariantListAction(bpy.types.Operator, uibase.LexBaseListAc
         room = bpy.context.scene.smithy2d.get_active_scene().get_active_room()
         return room
 
-    def on_add(self, item):
-        if self.shift:
-            bpy.ops.smithy2d.variant_renamer('INVOKE_DEFAULT', variant_datapath=item.path_from_id(), name="Variant", force=True)
-        else:
-            item.init("Variant")
-        item.save_scene_state(bpy.context.scene)
+    def new_item(self):
+        scene = bpy.context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room()
+        variant = room.get_active_variant()
+        unique_name = get_unique_variant_name(scene.name, room.name, variant.name) if variant and self.shift else get_unique_variant_name(scene.name, room.name, "Variant")
+        execute_type = "INVOKE_DEFAULT" if not self.shift else "EXEC_DEFAULT"
+        bpy.ops.smithy2d.variant_adder(execute_type, variant_name=unique_name, duplicate=self.shift)
 
     def remove_item(self, item_idx):
         item = self.get_collection()[item_idx]
-        bpy.ops.smithy2d.variant_deleter('INVOKE_DEFAULT', datapath=item.path_from_id(), force=self.shift)
+        bpy.ops.smithy2d.variant_deleter('INVOKE_DEFAULT', datapath=item.path_from_id())
 
 
 class Smithy2D_ME_SceneListAction(bpy.types.Operator, uibase.LexBaseListAction):
@@ -107,19 +109,14 @@ class Smithy2D_ME_SceneListAction(bpy.types.Operator, uibase.LexBaseListAction):
             bpy.context.scene.smithy2d.set_scene(index)
 
     def new_item(self):
-        item = bpy.context.scene.smithy2d.scenes.add()
-        refresh_screen_area("IMAGE_EDITOR")
-        return item
-
-    def on_add(self, item):
-        if self.shift:
-            bpy.ops.smithy2d.scene_renamer('INVOKE_DEFAULT', scene_datapath=item.path_from_id(), name="Scene", force=True)
-        else:
-            item.init("Scene")
+        scene = bpy.context.scene.smithy2d.get_active_scene()
+        unique_name = get_unique_scene_name(scene.name) if scene and self.shift else get_unique_scene_name("Scene")
+        execute_type = "INVOKE_DEFAULT" if not self.shift else "EXEC_DEFAULT"
+        bpy.ops.smithy2d.scene_adder(execute_type, scene_name=unique_name, duplicate=self.shift)
 
     def remove_item(self, item_idx):
         item = self.get_collection()[item_idx]
-        bpy.ops.smithy2d.scene_deleter('INVOKE_DEFAULT', datapath=item.path_from_id(), force=self.shift)
+        bpy.ops.smithy2d.scene_deleter('INVOKE_DEFAULT', datapath=item.path_from_id())
 
 
 class Smithy2D_VariantUIList(bpy.types.UIList):

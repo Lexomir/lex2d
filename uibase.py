@@ -26,7 +26,9 @@ class LexBaseListAction:
 
     def new_item(self):
         collection = self.get_collection()
-        return collection.add()
+        item = collection.add()
+        self.set_index(len(collection) - 1, propagate=True)
+        return item
     
     def remove_item(self, idx):
         collection = self.get_collection()
@@ -35,10 +37,6 @@ class LexBaseListAction:
             new_idx -= 1
         self.set_index(idx - 1, propagate=True)
         collection.remove(idx)
-
-    def on_add(self, added_item): pass
-
-    def on_remove(self, removed_item): pass
 
     # return "should continue executing?""
     def on_execute(self, context): 
@@ -80,10 +78,7 @@ class LexBaseListAction:
             self.move_item(idx, idx - 1)
             self.set_index(idx - 1, propagate=False)
         elif self.action == 'REMOVE' and item:
-            self.on_remove(item)
             self.remove_item(idx)
         elif self.action == 'ADD':
-            item = self.new_item()
-            self.on_add(item)
-            self.set_index(len(collection) - 1, propagate=True)
+            self.new_item()
         return {"FINISHED"}
