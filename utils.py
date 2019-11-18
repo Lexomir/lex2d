@@ -20,6 +20,9 @@ def refresh_screen_area(area_type):
 def multiply_vec3(vec, other_vec):
     return Vector([vec[0] * other_vec[0], vec[1] * other_vec[1], vec[2] * other_vec[2]])
 
+def divide_vec3(vec, other_vec):
+    return Vector([vec[0] / other_vec[0], vec[1] / other_vec[1], vec[2] / other_vec[2]])
+
 def move_directory(src_dir, dst_dir):
     shutil.move(src_dir, dst_dir)
 
@@ -209,6 +212,22 @@ def apply_bmesh_to_object(obj, bm):
     bpy.ops.object.mode_set(mode=mode)
     bpy.context.window.view_layer.objects.active = active_obj
 
+def get_or_create_texture_node(nodes, image):
+    for node in nodes:
+        if node.type == 'TEX_IMAGE' and node.image == image and node.image.colorspace_settings.name == 'sRGB':
+            return node
+    node = nodes.new("ShaderNodeTexImage")
+    node.image = image
+    node.image.colorspace_settings.name = 'sRGB'
+    return node
+
+def get_or_create_node(nodes, node_classname):
+    for node in nodes:
+        if type(node).__name__ == node_classname:
+            return node
+    node = nodes.new(node_classname)
+    return node
+
 def get_or_create_input_node(node_tree, src_node, input_node_type, from_output_name, to_input_id):
     connected_node = None
     src_input = src_node.inputs[to_input_id]
@@ -248,20 +267,21 @@ def set_material_image_texture(obj, image_filepath, tile_size=None):
     mat_output = get_active_material_output(material.node_tree.nodes)
 
     # start from scratch if the output isnt connected to an emission node
-    if mat_output.inputs['Surface'].links and type(mat_output.inputs['Surface'].links[0].from_node).__name__ != "ShaderNodeEmission":
+    if mat_output.inputs['Surface'].links and type(mat_output.inputs['Surface'].links[0].from_node).__name__ != "ShaderNodeMixShader":
         remove_all_except(material.node_tree.nodes, [mat_output])
 
     mix_node = get_or_create_input_node(material.node_tree, mat_output, "ShaderNodeMixShader", "Shader", "Surface")
     emission_node = get_or_create_input_node(material.node_tree, mix_node, "ShaderNodeEmission", "Emission", 2)
     transparent_node = get_or_create_input_node(material.node_tree, mix_node, "ShaderNodeBsdfTransparent", "BSDF", 1)
-    texture_node = get_or_create_input_node(material.node_tree, emission_node, "ShaderNodeTexImage", "Color", "Color")
+
+    texture_node = get_or_create_texture_node(material.node_tree.nodes, image=image)
+    material.node_tree.links.new(emission_node.inputs["Color"], texture_node.outputs["Color"])
     material.node_tree.links.new(mix_node.inputs[0], texture_node.outputs['Alpha'])
-    texture_node.image = image
-    texture_node.image.colorspace_settings.name = 'sRGB'
 
     # connect a mapping node (to only display one tile of the texture)
     tile_size = tile_size or image.size
-    mapping_node = get_or_create_input_node(material.node_tree, texture_node, "ShaderNodeMapping", "Vector", "Vector")
+    mapping_node = get_or_create_node(material.node_tree.nodes, "ShaderNodeMapping")
+    material.node_tree.links.new(texture_node.inputs["Vector"], mapping_node.outputs["Vector"])
     tex_coord_node = get_or_create_input_node(material.node_tree, mapping_node, "ShaderNodeTexCoord", "UV", "Vector")
 
     mapping_node.vector_type = "TEXTURE"
@@ -383,8 +403,14 @@ def vec3_approx_equals(vec, other, ep=.001):
         if abs(d) > ep: return False
     return True
 
+def update_active_object(context):
+    mode = context.mode
+    bpy.ops.object.mode_set(mode="EDIT", toggle=False)
+    bpy.ops.object.mode_set(mode="OBJECT", toggle=False)
+    bpy.ops.object.mode_set(mode=mode, toggle=False)
+
 def is_renderable(obj_state):
-    return not vec3_approx_equals(obj_state.dimensions, (0, 0, 0))
+    return not vec3_approx_equals(obj_state.bounds.get_dimensions(), (0, 0, 0))
 
 def room_script_exists(scene_name, room_name, variant_name):
     script_filepath = asset_abspath(room_script_assetpath(scene_name, room_name, variant_name))

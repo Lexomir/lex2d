@@ -1,6 +1,7 @@
 import bpy
 from .utils import *
 from . import ecs
+from .ObjUtils import BoundingBox, set_mesh_preserve_origin
 from .properties import SMITHY2D_INVALID_ID
 from bpy.app.handlers import persistent
 import addon_utils
@@ -23,10 +24,11 @@ def _obj_component_updated(scene, obj, smithy_component_instance):
                     mat, tex_node = set_material_image_texture(obj, abs_img_filepath + ext, tile_size=tile_size)
                     image = tex_node.image
                     tile_size = tile_size or image.size
+                    mat.node_tree.nodes.active = tex_node
 
                     # Regenerate mesh data
                     bm = create_rectangle_bmesh(screen_to_bl_size(tile_size))
-                    apply_bmesh_to_object(obj, bm)
+                    set_mesh_preserve_origin(obj, bm)
                     bm.free()
                     break
         else:

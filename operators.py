@@ -1,7 +1,6 @@
 import bpy
 import os
 import uuid
-import uuid
 import shutil
 import bmesh
 import subprocess
@@ -64,6 +63,7 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
                 material, tex_node = set_material_image_texture(active_obj, abs_filepath, tile_size=tile_size)
                 image = tex_node.image
                 tile_size = tile_size or image.size
+                material.node_tree.nodes.active = tex_node
 
                 render_component = active_obj.smithy2d.add_component("Render2D", is_global=True)
                 render_component.set_input("asset", os.path.splitext(rel_filepath)[0].replace('\\', '/'))
@@ -71,11 +71,6 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
                 # resize the plane
                 cur_aspect_ratio = active_obj.scale.x / active_obj.scale.y
                 aspect_ratio = tile_size[0] / tile_size[1]
-
-                # Regenerate mesh data
-                bm = create_rectangle_bmesh(screen_to_bl_size(tile_size))
-                apply_bmesh_to_object(active_obj, bm)
-                bm.free()
 
         return {'FINISHED'}
 
@@ -215,7 +210,23 @@ class Smithy2D_VariantAddOperator(bpy.types.Operator):
             return context.window_manager.invoke_props_dialog(self)
         else:
             variant = room.variants.add()
-            variant.init(self.variant_name)
+            active_variant = room.get_active_variant()
+            if not self.duplicate or not active_variant:
+                variant.init(self.variant_name)
+            else:
+                # duplicate
+                active_variant_assetpath = room_script_assetpath(scene.name, room.name, active_variant.name)
+                if valid_variant_assetpath(active_variant_assetpath):
+                    active_variant_abspath = asset_abspath(active_variant_assetpath)
+                    new_variant_abspath = asset_abspath(variant_assetpath)
+                    if os.path.exists(active_variant_abspath):
+                        shutil.copyfile(active_variant_abspath, new_variant_abspath)
+                active_variant.copy_into(variant)
+                variant.set_name(self.variant_name)
+            
+            if not variant.guid:
+                self.report({"ERROR"}, "Newly created variant '{}' doesn't have a guid for some reason".format(variant.name))
+                
             variant_guid = "{}\t{}\n".format(variant.guid, variant_assetpath)
 
             # add guids to guid file
@@ -275,9 +286,29 @@ class Smithy2D_RoomAddOperator(bpy.types.Operator):
             return context.window_manager.invoke_props_dialog(self)
         else:
             room = scene.rooms.add()
-            room.init(self.room_name)
+            active_room = scene.get_active_room()
+            if not self.duplicate or not active_room:
+                room.init(self.room_name)
+            else:
+                # duplicate
+                active_room_assetpath = room_dir_assetpath(scene.name, active_room.name)
+                if valid_room_assetpath(active_room_assetpath):
+                    active_room_abspath = asset_abspath(active_room_assetpath)
+                    new_room_abspath = asset_abspath(room_assetpath)
+                    if os.path.exists(active_room_abspath):
+                        shutil.copytree(active_room_abspath, new_room_abspath)
+                active_room.copy_into(room)
+                room.set_name(self.room_name)
+
+            # save the current state into the new variant
+            variant = room.get_active_variant()
+            if variant:
+                variant.save_scene_state(bpy.context.scene)
+
             room_guids = ["{}\t{}\n".format(room.guid, room_assetpath)]
             for variant in room.variants:
+                if not variant.guid:
+                    self.report({"ERROR"}, "variant '{}' inside newly created room '{}' does not have a guid for some reason".format(variant.name, room.name))
                 variant_assetpath = room_script_assetpath(scene.name, room.name, variant.name)
                 room_guids.append("{}\t{}\n".format(variant.guid, variant_assetpath))
 
@@ -285,10 +316,6 @@ class Smithy2D_RoomAddOperator(bpy.types.Operator):
             guid_filepath = get_guid_mapfile()
             with open(guid_filepath, "a") as guid_file:
                 guid_file.writelines(room_guids)
-
-            variant = room.get_active_variant() 
-            if variant and self.duplicate:
-                variant.save_scene_state(bpy.context.scene)
 
             scene.set_room_and_update(len(scene.rooms) - 1)
             refresh_screen_area(context.area.type)
@@ -299,6 +326,7 @@ class Smithy2D_RoomAddOperator(bpy.types.Operator):
     
     def update_name(self, context):
         context.scene.smithy2d.get_active_scene()
+        scene = context.scene.smithy2d.get_active_scene()
         room_assetpath = room_dir_assetpath(scene.name, self.room_name)
         if not valid_room_assetpath(room_assetpath):
             self.warning = "Invalid room name"
@@ -333,12 +361,36 @@ class Smithy2D_SceneAddOperator(bpy.types.Operator):
             return context.window_manager.invoke_props_dialog(self)
         else:
             scene = context.scene.smithy2d.scenes.add()
-            scene.init(self.scene_name)
+            active_scene = context.scene.smithy2d.get_active_scene()
+            if not self.duplicate or not active_scene:
+                scene.init(self.scene_name)
+            else:
+                # duplicate
+                active_scene_assetpath = scene_dir_assetpath(active_scene.name)
+                if valid_scene_assetpath(active_scene_assetpath):
+                    active_scene_abspath = asset_abspath(active_scene_assetpath)
+                    new_scene_abspath = asset_abspath(scene_assetpath)
+                    if os.path.exists(active_scene_abspath):
+                        shutil.copytree(active_scene_abspath, new_scene_abspath)
+                active_scene.copy_into(scene)
+                scene.set_name(self.scene_name)
+
+            # save the current state into the new variant
+            room = scene.get_active_room()
+            variant = room.get_active_variant() if room else None
+            if variant:
+                variant.save_scene_state(bpy.context.scene)
+
+            # collect new scene guids
             scene_guids = ["{}\t{}\n".format(scene.guid, scene_assetpath)]
             for room in scene.rooms:
+                if not room.guid:
+                    self.report({"ERROR"}, "room '{}' inside newly created scene '{}' does not have a guid for some reason".format(room.name, scene.name))
                 room_assetpath = room_dir_assetpath(scene.name, room.name)
                 scene_guids.append("{}\t{}\n".format(room.guid, room_assetpath))
                 for variant in room.variants:
+                    if not variant.guid:
+                        self.report({"ERROR"}, "variant '{}' inside newly created scene '{}' does not have a guid for some reason".format(variant.name, scene.name))
                     variant_assetpath = room_script_assetpath(scene.name, room.name, variant.name)
                     scene_guids.append("{}\t{}\n".format(variant.guid, variant_assetpath))
 
@@ -346,11 +398,6 @@ class Smithy2D_SceneAddOperator(bpy.types.Operator):
             guid_filepath = get_guid_mapfile()
             with open(guid_filepath, "a") as guid_file:
                 guid_file.writelines(scene_guids)
-
-            room = scene.get_active_room() 
-            variant = room.get_active_variant() if room else None
-            if variant and self.duplicate:
-                variant.save_scene_state(bpy.context.scene)
 
             context.scene.smithy2d.set_scene_and_update(len(context.scene.smithy2d.scenes) - 1)
             refresh_screen_area(context.area.type)
@@ -946,117 +993,131 @@ class SyncWithAssetFolder(bpy.types.Operator):
 
         # sync existing assets with contents on disk
         guid_map = {}
+        used_guids = set()
         assetpath_map = {}
+        def get_or_create_guid_assetpath_binding(guid, default_assetpath):
+            assetpath = guid_map.get(guid)
+            if not assetpath:
+                assetpath = default_assetpath
+                guid_map[guid] = assetpath
+                assetpath_map[assetpath] = guid
+            return assetpath
+        def get_or_create_assetpath_guid_binding(assetpath, default_guid):
+            guid = assetpath_map.get(default_guid)
+            if not guid:
+                guid = default_guid
+                guid_map[guid] = assetpath
+                assetpath_map[assetpath] = guid
+            return guid
+                
+
         guid_map_filepath = get_guid_mapfile()
         os.makedirs(os.path.dirname(guid_map_filepath), exist_ok=True)
-        file_access = "r+" if os.path.exists(guid_map_filepath) else "w+"
-        with open(guid_map_filepath, file_access) as guid_file:
-            # parse the guids from the guid-assetpath map file
-            for line in guid_file:
-                line_parts = line.split("\t")
-                guid, assetpath = line_parts[0], line_parts[1].rstrip()
-                guid_map[guid] = assetpath
-                assetpath_map[guid] = guid
+        if os.path.exists(guid_map_filepath):
+            with open(guid_map_filepath, "r") as guid_file:
+                # parse the guids from the guid-assetpath map file
+                for line in guid_file:
+                    line_parts = line.split("\t")
+                    guid, assetpath = line_parts[0], line_parts[1].rstrip()
+                    get_or_create_guid_assetpath_binding(guid, assetpath)
             
-            # rename each scene according to its mapped directories
-            for scene in context.scene.smithy2d.scenes:
-                current_assetpath = scene_dir_assetpath(scene.name)
-                if not scene.guid:
+        # rename each scene according to its mapped directories
+        for scene in context.scene.smithy2d.scenes:
+            current_assetpath = scene_dir_assetpath(scene.name)
+            if not scene.guid:
+                if current_assetpath in assetpath_map:
+                    self.report({"ERROR"}, "This scene doesn't have a guid, but somehow its directory is in the guid mapfile.")
+                scene.guid = create_guid()
+
+            # if no guid, this scene gets linked to the directory of its current name
+            new_assetpath = get_or_create_guid_assetpath_binding(scene.guid, default_assetpath=current_assetpath)
+            used_guids.add(scene.guid)
+
+            # set the scene's name according to its directory name
+            scene.name = scene_from_assetpath(new_assetpath)
+
+            # rename each room according to its mapped directories
+            for room in scene.rooms:
+                current_assetpath = room_dir_assetpath(scene.name, room.name)
+                if not room.guid:
                     if current_assetpath in assetpath_map:
-                        self.report({"ERROR"}, "This scene doesn't have a guid, but somehow its directory is in the guid mapfile.")
-                    scene.guid = create_guid()
+                        self.report({"ERROR"}, "This room doesn't have a guid, but somehow its directory is in the guid mapfile.")
+                    room.guid = create_guid()
 
-                # if no guid, this scene gets linked to the directory of its current name
-                new_assetpath = guid_map.get(scene.guid)
-                if not new_assetpath:
-                    new_assetpath = current_assetpath
-                    guid_file.write("{}\t{}\n".format(scene.guid, new_assetpath))
-                    guid_map[scene.guid] = new_assetpath
-                # set the scene's name according to its directory name
-                scene.name = scene_from_assetpath(new_assetpath)
+                # if no guid, this room gets linked to the directory of its current name
+                new_assetpath = get_or_create_guid_assetpath_binding(room.guid, default_assetpath=current_assetpath)
+                used_guids.add(room.guid)
 
-                # rename each room according to its mapped directories
-                for room in scene.rooms:
-                    current_assetpath = room_dir_assetpath(scene.name, room.name)
-                    if not room.guid:
+                # set the room's name according to its directory name
+                room.name = room_from_assetpath(new_assetpath)
+
+                # rename each variant according to its mapped script file
+                for variant in room.variants:
+                    current_assetpath = room_script_assetpath(scene.name, room.name, variant.name)
+                    if not variant.guid:
                         if current_assetpath in assetpath_map:
-                            self.report({"ERROR"}, "This room doesn't have a guid, but somehow its directory is in the guid mapfile.")
-                        room.guid = create_guid()
+                            self.report({"ERROR"}, "This variant doesn't have a guid, but somehow its script is in the guid mapfile.")
+                        variant.guid = create_guid()
 
-                    # if no guid, this room gets linked to the directory of its current name
-                    new_assetpath = guid_map.get(room.guid)
-                    if not new_assetpath:
-                        new_assetpath = current_assetpath
-                        guid_file.write("{}\t{}\n".format(room.guid, new_assetpath))
-                        guid_map[room.guid] = new_assetpath
-                    # set the room's name according to its directory name
-                    room.name = room_from_assetpath(new_assetpath)
+                    # if no guid, this variant gets linked to the file of its current name
+                    new_assetpath = get_or_create_guid_assetpath_binding(variant.guid, default_assetpath=current_assetpath)
+                    used_guids.add(variant.guid)
 
-                    # rename each variant according to its mapped script file
-                    for variant in room.variants:
-                        current_assetpath = room_script_assetpath(scene.name, room.name, variant.name)
-                        if not variant.guid:
-                            if current_assetpath in assetpath_map:
-                                self.report({"ERROR"}, "This variant doesn't have a guid, but somehow its script is in the guid mapfile.")
-                            variant.guid = create_guid()
+                    # set the variant's name according to its script name
+                    variant.name = variant_from_assetpath(new_assetpath)
 
-                        # if no guid, this variant gets linked to the file of its current name
-                        new_assetpath = guid_map.get(variant.guid)
-                        if not new_assetpath:
-                            new_assetpath = current_assetpath
-                            guid_file.write("{}\t{}\n".format(variant.guid, new_assetpath))
-                            guid_map[variant.guid] = new_assetpath
-                        # set the variant's name according to its script name
-                        variant.name = variant_from_assetpath(new_assetpath)
+        # find new assets on disk
+        scenes_dir = asset_abspath("scripts/")
+        for scene_name in os.listdir(scenes_dir):
+            if scene_name != "core" and os.path.isdir(os.path.join(scenes_dir, scene_name)):
+                scene = context.scene.smithy2d.scenes.get(scene_name)
+                scene_assetpath = scene_dir_assetpath(scene_name)
+                scene_abspath = asset_abspath(scene_assetpath)
+                # add scene if it doesnt exist in the blendfile
+                if not scene:
+                    scene = context.scene.smithy2d.scenes.add()
+                    scene.name = scene_name
+                    scene.guid = get_or_create_assetpath_guid_binding(scene_assetpath, default_guid=create_guid())
+                    used_guids.add(scene.guid)
 
-            # find new assets on disk
-            scenes_dir = asset_abspath("scripts/")
-            for scene_name in os.listdir(scenes_dir):
-                if scene_name != "core" and os.path.isdir(os.path.join(scenes_dir, scene_name)):
-                    scene = context.scene.smithy2d.scenes.get(scene_name)
-                    scene_assetpath = scene_dir_assetpath(scene_name)
-                    scene_abspath = asset_abspath(scene_assetpath)
-                    # add scene if it doesnt exist in the blendfile
-                    if not scene:
-                        scene = context.scene.smithy2d.scenes.add()
-                        scene.name = scene_name
-                        scene.guid = assetpath_map.get(scene_assetpath) or ""
-                        if not scene.guid:
-                            scene.guid = create_guid()
-                            guid_file.write("{}\t{}\n".format(scene.guid, scene_assetpath))
+                # find new room assets on disk
+                for room_name in os.listdir(scene_abspath):
+                    if os.path.isdir(os.path.join(scene_abspath, room_name)):
+                        room = scene.rooms.get(room_name)
+                        room_assetpath = room_dir_assetpath(scene_name, room_name)
+                        room_abspath = asset_abspath(room_assetpath)
+                        # add room if it doesnt exist in the blendfile
+                        if not room:
+                            room = scene.rooms.add()
+                            room.name = room_name
+                            room.guid = assetpath_map.get(room_assetpath) or ""
+                            room.guid = get_or_create_assetpath_guid_binding(room_assetpath, default_guid=create_guid())
+                            used_guids.add(room.guid)
 
-                    # find new room assets on disk
-                    for room_name in os.listdir(scene_abspath):
-                        if os.path.isdir(os.path.join(scene_abspath, room_name)):
-                            room = scene.rooms.get(room_name)
-                            room_assetpath = room_dir_assetpath(scene_name, room_name)
-                            room_abspath = asset_abspath(room_assetpath)
-                            # add room if it doesnt exist in the blendfile
-                            if not room:
-                                room = scene.rooms.add()
-                                room.name = room_name
-                                room.guid = assetpath_map.get(room_assetpath) or ""
-                                if not room.guid:
-                                    room.guid = create_guid()
-                                    guid_file.write("{}\t{}\n".format(room.guid, room_assetpath))
+                        # find new variant assets on disk
+                        variants_dir = os.path.join(room_abspath, "states")
+                        if os.path.exists(variants_dir) and os.path.isdir(variants_dir):
+                            for variant_filename in os.listdir(variants_dir):
+                                variant_name, ext = os.path.splitext(variant_filename)
+                                if ext == ".lua":
+                                    variant = room.variants.get(variant_name)
+                                    variant_assetpath = room_script_assetpath(scene_name, room_name, variant_name)
+                                    # add variant if it doesnt exist in the blendfile
+                                    if not variant:
+                                        variant = room.variants.add()
+                                        variant.name = variant_name
+                                        variant.guid = get_or_create_assetpath_guid_binding(variant_assetpath, default_guid=create_guid())
+                                        used_guids.add(variant.guid)
+        # write changes to the guid map file
+        if guid_map:
+            tmp_guid_map_filepath = get_guid_mapfile() + ".tmp"
+            with open(tmp_guid_map_filepath, "w") as tmp_guid_file:
+                for guid in used_guids:
+                    assetpath = guid_map[guid]
+                    tmp_guid_file.write("{}\t{}\n".format(guid, assetpath))
+            os.replace(tmp_guid_map_filepath, guid_map_filepath)
 
-                            # find new variant assets on disk
-                            variants_dir = os.path.join(room_abspath, "states")
-                            if os.path.exists(variants_dir) and os.path.isdir(variants_dir):
-                                for variant_filename in os.listdir(variants_dir):
-                                    variant_name, ext = os.path.splitext(variant_filename)
-                                    if ext == ".lua":
-                                        variant = room.variants.get(variant_name)
-                                        variant_assetpath = room_script_assetpath(scene_name, room_name, variant_name)
-                                        # add variant if it doesnt exist in the blendfile
-                                        if not variant:
-                                            variant = room.variants.add()
-                                            variant.name = variant_name
-                                            variant.guid = assetpath_map.get(variant_assetpath) or ""
-                                            if not variant.guid:
-                                                variant.guid = create_guid()
-                                                guid_file.write("{}\t{}\n".format(variant.guid, variant_assetpath))
-
+        refresh_screen_area("PROPERTIES")
         return {"FINISHED"}
 
 

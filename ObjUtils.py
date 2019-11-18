@@ -1,6 +1,7 @@
 import bpy
 import bmesh
 import mathutils
+from .utils import *
 
 def get_bounds(obj):
     return BoundingBox(obj)
@@ -54,9 +55,9 @@ class BoundingBoxBase:
             self.box_min[i] = min(values)
             self.box_max[i] = max(values)
     
-    def get_bottomfrontleft(self): return self.box_min
+    def get_bottomfrontleft(self): return mathutils.Vector(self.box_min)
     def get_bottombackleft(self): return mathutils.Vector([self.box_min[0], self.box_max[1], self.box_min[2]])
-    def get_topbackright(self): return self.box_max
+    def get_topbackright(self): return mathutils.Vector(self.box_max)
 
     def copy(bounds):
         self.box_min = bounds.box_min
@@ -72,7 +73,23 @@ class BoundingBox(BoundingBoxBase):
         self.set_from_object(obj) 
 
 
-
 class BpyBoundingBox(bpy.types.PropertyGroup, BoundingBoxBase):
+    def copy_into(self, other_bb):
+        other_bb.box_min = self.box_min
+        other_bb.box_max = self.box_max
+
     box_min : bpy.props.FloatVectorProperty(size=3, default=[0, 0, 0])
     box_max : bpy.props.FloatVectorProperty(size=3, default=[0, 0, 0])
+
+def set_mesh_preserve_origin(obj, bm):
+    original_bb = BoundingBox(obj)
+    obj_size = original_bb.get_dimensions()
+    tl = original_bb.get_bottombackleft()
+    tl = mathutils.Vector([tl[0] / obj_size[0], tl[1] / obj_size[1], 0])
+    apply_bmesh_to_object(obj, bm)
+    new_bb = BoundingBox(obj)
+    new_size = new_bb.get_dimensions()
+    new_tl = new_bb.get_bottombackleft()
+    new_tl = mathutils.Vector([new_tl[0] / new_size[0], new_tl[1] / new_size[1], 0])
+    vert_move_amt = multiply_vec3((tl - new_tl), new_size)
+    shift_verts(obj, vert_move_amt)

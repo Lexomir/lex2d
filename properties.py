@@ -17,6 +17,11 @@ class Smithy2D_SerializedComponent(bpy.types.PropertyGroup):
     is_global : bpy.props.BoolProperty(default=False)
     data : bpy.props.StringProperty()
 
+    def copy_into(self, other_sc):
+        other_sc.name = self.name
+        other_sc.is_global = self.is_global
+        other_sc.data = self.data
+
     def get_assetpath(self, scene, room):
         if self.is_global:
             return global_component_assetpath(self.name)
@@ -50,6 +55,10 @@ class Smithy2D_SerializedComponent(bpy.types.PropertyGroup):
             ci.datatype = datatype
             ci._set_string_value(str_value)
 
+def flatten(mat):
+    dim = len(mat)
+    return [mat[j][i] for i in range(dim) 
+                    for j in range(dim)]
 class Smithy2D_ObjectState(bpy.types.PropertyGroup):
     def get_name(self):
         return self.name
@@ -59,6 +68,23 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
         room = bpy_scene.path_resolve(".".join(self.path_from_id().split('.')[0:-1]))
         return room
 
+    def copy_into(self, other_state):
+        other_state.name = self.name
+        other_state.obj_type = self.obj_type
+        other_state.size = self.size
+        other_state.topleft = self.topleft
+        other_state.matrix_local = flatten(self.matrix_local)
+        other_state.dimensions = self.dimensions
+        self.bounds.copy_into(other_state.bounds)
+        self.parent = other_state.parent
+        for sc in self.components_serialized:
+            new_sc = other_state.components_serialized.add()
+            sc.copy_into(new_sc)
+        for sd in self.custom_state_data:
+            new_sd = other_state.custom_state_data.add()
+            new_sd.name = sd.name
+            new_sd.value = sd.value
+
     # save object state
     def save(self, obj):
         self.components_serialized.clear()
@@ -67,10 +93,6 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
                 sc = self.components_serialized.add()
                 sc.serialize(c)
 
-        def flatten(mat):
-            dim = len(mat)
-            return [mat[j][i] for i in range(dim) 
-                            for j in range(dim)]
         self.matrix_local = flatten(obj.matrix_local)
 
         self.topleft = ObjUtils.BoundingBox(obj).get_bottombackleft() # bottom back left of the raw data (not scaled)
@@ -94,6 +116,13 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
         obj.parent = bpy.data.objects.get(self.parent)
         
         if obj.type == "MESH":
+            # Regenerate mesh data
+            mesh_size = self.bounds.get_dimensions()
+            mesh_size = (mesh_size[0], mesh_size[1])
+            bm = create_rectangle_bmesh(mesh_size)
+            apply_bmesh_to_object(obj, bm)
+            bm.free()
+
             # find the delta vertex movement of object (compare the top left bounding box of both states)
             bounds = ObjUtils.BoundingBox(obj)
             tl = bounds.get_bottombackleft()
@@ -168,10 +197,19 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
         self.guid = str(uuid.uuid4())
         name = get_unique_variant_name(scene.name, room.name, name)
         variant_script_filepath = asset_abspath(room_script_assetpath(scene.name, room.name, name))
-        if not os.path.exists(variant_script_filepath) and create_room_script(scene.name, room.name, name):
-            self.set_name(name)
+        self.set_name(name)
+        if not os.path.exists(variant_script_filepath):
+            create_room_script(scene.name, room.name, name)
         else:
             print("ERROR: Setting variant name to '{}', but there is already a script file at '{}'".format(name, variant_script_filepath))
+
+    def copy_into(self, other_variant):
+        other_variant.name = self.name
+        other_variant.guid = str(uuid.uuid4())
+        other_variant.object_states.clear()
+        for obj_state in self.object_states:
+            other_state = other_variant.object_states.add()
+            obj_state.copy_into(other_state)
 
     def set_name(self, val):
         self['name'] = val
@@ -227,6 +265,17 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
         self.size = (.2, .2)
         self.location = (.4, .4)
         return self
+
+    def copy_into(self, other_room):
+        other_room.name = self.name
+        other_room.location = self.location
+        other_room.size = self.size
+        other_room.guid = str(uuid.uuid4())
+        other_room.set_variant(self.active_variant_index)
+        other_room.variants.clear()
+        for variant in self.variants:
+            other_variant = other_room.variants.add()
+            variant.copy_into(other_variant)
 
     def __str__(self):
         return "{}:{}".format(self.get_scene().name or "_", self.name or "_")
@@ -359,6 +408,16 @@ class Smithy2D_Scene(bpy.types.PropertyGroup):
         self.set_room(0)
 
         return self
+    
+    def copy_into(self, other_scene):
+        other_scene.name = self.name
+        other_scene.set_room(self.active_room_index)
+        other_scene.map_image = self.map_image
+        other_scene.guid = str(uuid.uuid4())
+        other_scene.rooms.clear()
+        for room in self.rooms:
+            other_room = other_scene.rooms.add()
+            room.copy_into(other_room)
 
     def get_unique_name(self, name):
         final_name = name
