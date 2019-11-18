@@ -404,10 +404,13 @@ def vec3_approx_equals(vec, other, ep=.001):
     return True
 
 def update_active_object(context):
-    mode = context.mode
-    bpy.ops.object.mode_set(mode="EDIT", toggle=False)
-    bpy.ops.object.mode_set(mode="OBJECT", toggle=False)
-    bpy.ops.object.mode_set(mode=mode, toggle=False)
+    can_update = bpy.ops.object.mode_set.poll()
+    if can_update:
+        mode = context.mode
+        bpy.ops.object.mode_set(mode="EDIT", toggle=False)
+        bpy.ops.object.mode_set(mode="OBJECT", toggle=False)
+        bpy.ops.object.mode_set(mode=mode, toggle=False)
+    return can_update
 
 def is_renderable(obj_state):
     return not vec3_approx_equals(obj_state.bounds.get_dimensions(), (0, 0, 0))

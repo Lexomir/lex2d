@@ -37,6 +37,10 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
             abs_filepath = os.path.normpath(abs_dirpath + active_browser.params.filename)
             abs_img_dir = os.path.normpath(bpy.path.abspath(get_image_dir()))
             in_img_dir = os.path.commonpath([abs_filepath, abs_img_dir]) == abs_img_dir
+            filename, file_ext = os.path.splitext(abs_filepath)
+
+            if not os.path.exists(abs_filepath) or file_ext.lower() not in ['.jpg', '.png']:
+                return {"CANCELLED"}
 
             if in_img_dir:
                 rel_filepath = os.path.relpath(abs_filepath, start=abs_img_dir)
@@ -45,9 +49,7 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
                 shutil.copy2(abs_filepath, abs_img_dir) # complete target filename given
                 rel_filepath = os.path.basename(abs_filepath)
 
-            # if image, set texture of active object
-            filename, file_ext = os.path.splitext(abs_filepath)
-            
+            # create an object if none are selected
             active_obj = context.object 
             if not active_obj or not active_obj.select_get():
                 obj_name = os.path.basename(filename)
@@ -55,22 +57,25 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
                 active_obj = bpy.data.objects.new(obj_name, data)
                 move_onstage(active_obj)
                 active_obj.location = bpy.context.scene.cursor.location
+                bpy.context.window.view_layer.objects.active = active_obj
+                update_active_object(context) # need this cuz the dimensions of the object are wrong until you update
 
-            if file_ext.lower() in ['.jpg', '.png']:
-                spritesheet_data = find_spritesheet_data_for_image(rel_filepath)
-                tile_size = spritesheet_data['tile_size'] if spritesheet_data else None
+            # set texture of active object
+            spritesheet_data = find_spritesheet_data_for_image(rel_filepath)
+            tile_size = spritesheet_data['tile_size'] if spritesheet_data else None
 
-                material, tex_node = set_material_image_texture(active_obj, abs_filepath, tile_size=tile_size)
-                image = tex_node.image
-                tile_size = tile_size or image.size
-                material.node_tree.nodes.active = tex_node
+            material, tex_node = set_material_image_texture(active_obj, abs_filepath, tile_size=tile_size)
+            image = tex_node.image
+            tile_size = tile_size or image.size
+            material.node_tree.nodes.active = tex_node
 
-                render_component = active_obj.smithy2d.add_component("Render2D", is_global=True)
-                render_component.set_input("asset", os.path.splitext(rel_filepath)[0].replace('\\', '/'))
+            # add render component (this also generates the sprite geometry)
+            render_component = active_obj.smithy2d.add_component("Render2D", is_global=True)
+            render_component.set_input("asset", os.path.splitext(rel_filepath)[0].replace('\\', '/'))
 
-                # resize the plane
-                cur_aspect_ratio = active_obj.scale.x / active_obj.scale.y
-                aspect_ratio = tile_size[0] / tile_size[1]
+            # resize the plane
+            cur_aspect_ratio = active_obj.scale.x / active_obj.scale.y
+            aspect_ratio = tile_size[0] / tile_size[1]
 
         return {'FINISHED'}
 
@@ -234,7 +239,7 @@ class Smithy2D_VariantAddOperator(bpy.types.Operator):
             with open(guid_filepath, "a") as guid_file:
                 guid_file.write(variant_guid)
 
-            if variant and self.duplicate:
+            if variant:
                 variant.save_scene_state(bpy.context.scene)
 
             room.set_variant_and_update(len(room.variants) - 1)

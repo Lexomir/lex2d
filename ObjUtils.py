@@ -84,12 +84,18 @@ class BpyBoundingBox(bpy.types.PropertyGroup, BoundingBoxBase):
 def set_mesh_preserve_origin(obj, bm):
     original_bb = BoundingBox(obj)
     obj_size = original_bb.get_dimensions()
-    tl = original_bb.get_bottombackleft()
-    tl = mathutils.Vector([tl[0] / obj_size[0], tl[1] / obj_size[1], 0])
+    if obj_size[0] == 0 or obj_size[1] == 0:
+        tl = mathutils.Vector([0,0,0])
+    else:
+        tl = original_bb.get_bottombackleft()
+        tl = mathutils.Vector([tl[0] / obj_size[0], tl[1] / obj_size[1], 0])
     apply_bmesh_to_object(obj, bm)
     new_bb = BoundingBox(obj)
     new_size = new_bb.get_dimensions()
-    new_tl = new_bb.get_bottombackleft()
-    new_tl = mathutils.Vector([new_tl[0] / new_size[0], new_tl[1] / new_size[1], 0])
+    if new_size[0] == 0 or new_size[1] == 0:
+        new_tl = mathutils.Vector([0,0,0])
+    else:
+        new_tl = new_bb.get_bottombackleft()
+        new_tl = mathutils.Vector([new_tl[0] / new_size[0], new_tl[1] / new_size[1], 0])
     vert_move_amt = multiply_vec3((tl - new_tl), new_size)
     shift_verts(obj, vert_move_amt)
