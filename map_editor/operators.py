@@ -114,7 +114,7 @@ class Smithy2D_RoomSelector(bpy.types.Operator):
                 region_x = event.mouse_x - region.x
                 region_y = event.mouse_y - region.y
                 if region_x >= 0 and region_x <= region.width and region_y >= 0 and region_y <= region.height:
-                    _mouse_view_location = region.view2d.region_to_view(regison_x, region_y)
+                    _mouse_view_location = region.view2d.region_to_view(region_x, region_y)
                     _editor_area = area
                     for i, room in enumerate(scene.rooms):
                         if room.contains(_mouse_view_location):
