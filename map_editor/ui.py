@@ -142,6 +142,63 @@ class Smithy2D_SceneUIList(bpy.types.UIList):
         layout.label(text=item.name)
 
 
+class Smithy2D_MT_variant_list_options(bpy.types.Menu):
+    bl_idname = "SMITHY2D_MT_variant_list_options"
+    bl_label = "Options"
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene.smithy2d.get_active_scene()
+        return scene and scene.get_active_room()
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room()
+        variant = room.get_active_variant() 
+        assetpath = room_script_assetpath(scene.name, room.name, variant.name if variant else "_") 
+        variant_path = asset_abspath(assetpath)
+        layout.operator("smithy2d.show_path_in_explorer", text="Open In Explorer").path = variant_path
+        layout.operator("smithy2d.copy_variant_to_clipboard", text="Copy Variant")
+        layout.operator("smithy2d.paste_variant_from_clipboard", text="Paste Variant")
+
+class Smithy2D_MT_room_list_options(bpy.types.Menu):
+    bl_idname = "SMITHY2D_MT_room_list_options"
+    bl_label = "Options"
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene.smithy2d.get_active_scene()
+        return scene
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room()
+        assetpath = room_dir_assetpath(scene.name, room.name if room else "_") 
+        room_path = asset_abspath(assetpath)
+        layout.operator("smithy2d.show_path_in_explorer", text="Open In Explorer").path = room_path
+        layout.operator("smithy2d.copy_room_to_clipboard", text="Copy Room")
+        layout.operator("smithy2d.paste_room_from_clipboard", text="Paste Room")
+
+class Smithy2D_MT_scene_list_options(bpy.types.Menu):
+    bl_idname = "SMITHY2D_MT_scene_list_options"
+    bl_label = "Options"
+
+    @classmethod
+    def poll(cls, context):
+        return True
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene.smithy2d.get_active_scene()
+        assetpath = scene_dir_assetpath(scene.name if scene else "_") 
+        scene_path = asset_abspath(assetpath)
+        layout.operator("smithy2d.show_path_in_explorer", text="Open In Explorer").path = scene_path
+        layout.operator("smithy2d.copy_scene_to_clipboard", text="Copy Scene")
+        layout.operator("smithy2d.paste_scene_from_clipboard", text="Paste Scene")
+
+
 class Smithy2D_ME_PT_Scenes(bpy.types.Panel):
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'UI'
@@ -175,10 +232,7 @@ class Smithy2D_ME_PT_Scenes(bpy.types.Panel):
             draw_list_action("lexlistaction.smithy2d_scene_list_action", list_action_col, 'DOWN', 'TRIA_DOWN')
         
         list_action_col.separator()
-        smithy_scene = context.scene.smithy2d.get_active_scene()
-        assetpath = scene_dir_assetpath(smithy_scene.name) if smithy_scene else scene_dir_assetpath("_")
-        scene_path = asset_abspath(assetpath) 
-        list_action_col.operator("smithy2d.show_path_in_explorer", icon="FILEBROWSER", text="").path = scene_path
+        list_action_col.operator("wm.call_menu", icon="DOWNARROW_HLT", text="").name = "SMITHY2D_MT_scene_list_options"
 
         if not bpy.data.filepath:
             layout.enabled = False
@@ -222,9 +276,7 @@ class Smithy2D_ME_PT_SceneRooms(bpy.types.Panel):
         
         list_action_col.separator()
         room = smithy_scene.get_active_room()
-        assetpath = room_dir_assetpath(smithy_scene.name, room.name) if room else scene_dir_assetpath(smithy_scene.name)
-        room_path = asset_abspath(assetpath)
-        list_action_col.operator("smithy2d.show_path_in_explorer", icon="FILEBROWSER", text="").path = room_path
+        list_action_col.operator("wm.call_menu", icon="DOWNARROW_HLT", text="").name = "SMITHY2D_MT_room_list_options"
         
         if room:
             layout.prop(room, "location", text="Position")
@@ -272,10 +324,7 @@ class Smithy2D_ME_PT_SceneRoomVariants(bpy.types.Panel):
             draw_list_action("lexlistaction.smithy2d_roomvariant_list_action", list_action_col, 'DOWN', 'TRIA_DOWN')
             
         list_action_col.separator()
-        variant = room.get_active_variant()
-        assetpath = room_script_assetpath(smithy_scene.name, room.name, variant.name) if variant else room_dir_assetpath(smithy_scene.name, room.name)
-        variant_path = asset_abspath(assetpath)
-        list_action_col.operator("smithy2d.show_path_in_explorer", icon="FILEBROWSER", text="").path = variant_path
+        list_action_col.operator("wm.call_menu", icon="DOWNARROW_HLT", text="").name = "SMITHY2D_MT_variant_list_options"
 
         if room.variants:
             layout.operator('smithy2d.edit_selected_room_script', text="Edit Script")

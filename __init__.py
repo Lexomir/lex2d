@@ -25,7 +25,10 @@ bl_info = {
 }
 
 import bpy
+import os
+import uuid
 import sys
+from .utils import *
 from mathutils import Vector, Matrix, Quaternion
 from bpy.app.handlers import persistent
 from . import auto_load
@@ -91,24 +94,15 @@ def add_lex_suite_registered_callback(callback):
 
 @persistent
 def _on_blend_load_post(dummy):
-    def flatten(mat):
-        dim = len(mat)
-        return [mat[j][i] for i in range(dim) 
-                        for j in range(dim)]
+    if bpy.context.scene.smithy2d.scenes:
+        serialized_state = ""
+        for scene in bpy.context.scene.smithy2d.scenes:
+            serialized_state += "{}~\n".format(serialize_scene(scene))
+        state_outputfilepath = os.path.join(bpy.path.abspath("//"), ".lexeditor", "last_opened_state_info.txt")
+        os.makedirs(os.path.dirname(state_outputfilepath), exist_ok=True)
+        with open(state_outputfilepath, "w") as state_file:
+            state_file.write(serialized_state)
 
-    # adapt old data into new version 
-    for scene in bpy.context.scene.smithy2d.scenes:
-        for room in scene.rooms:
-            for variant in room.variants:
-                for obj_state in variant.object_states:
-                    if obj_state.need_old_stuff:
-                        loc = Vector(obj_state.location)
-                        rot = Quaternion(obj_state.rotation_quaternion)
-                        scale = Vector(obj_state.scale)
-                        mat = rot.to_matrix().to_4x4() @ Matrix.Diagonal(scale).to_4x4()
-                        obj_state.matrix_local = flatten(mat)
-                        obj_state.need_old_stuff = False
-    
     # sync with the assets on drive
     if bpy.data.filepath:
         bpy.ops.smithy2d.sync_with_asset_folder()

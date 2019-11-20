@@ -1,9 +1,10 @@
 import bpy
 import sys
 import shutil
+import uuid
 import os
 import bmesh
-from mathutils import Vector
+from mathutils import Vector, Matrix, Quaternion
 import time
 
 def refresh_screen_area(area_type):
@@ -84,7 +85,7 @@ def find_map_editor_areas():
 
 def get_or_create_object(obj_name, obj_type):
     obj = bpy.data.objects.get(obj_name)
-    if not obj or obj.type != obj_type:
+    if not obj or obj_type != obj.type:
         data = None
         if obj_type == "MESH":
             data = bpy.data.meshes.new(obj_name)
@@ -146,7 +147,8 @@ def load_state(state):
         for me in map_editors:
             me.spaces.active.image = new_map_image
     # load the new variant
-    variant.load_scene_state(bpy.context.scene)
+    if variant:
+        variant.load_scene_state(bpy.context.scene)
 
 def switch_state(old_state, new_state):
     old_scene, old_room, old_variant = old_state
@@ -575,3 +577,141 @@ def get_unique_variant_name(scene_name, room_name, variant_basename):
             i += 1
             final_name = variant_basename + "_" + str(i)
     return final_name
+
+
+def get_guids_maps_from_file():
+    guid_map = {}
+    assetpath_map = {}
+    if not bpy.data.filepath:
+        return {}, {}
+    guid_map_filepath = get_guid_mapfile()
+    os.makedirs(os.path.dirname(guid_map_filepath), exist_ok=True)
+    if os.path.exists(guid_map_filepath):
+        with open(guid_map_filepath, "r") as guid_file:
+            # parse the guids from the guid-assetpath map file
+            for line in guid_file:
+                line_parts = line.split("\t")
+                guid, assetpath = line_parts[0], line_parts[1].rstrip()
+                guid_map[guid] = assetpath
+                assetpath_map[assetpath] = guid
+    return guid_map, assetpath_map
+            
+
+def serialize_variant(variant):
+    output = "\t\tv\t{}\n".format(variant.name)
+
+    def hierarchy_depth(state):
+        hierarchy_depth = 0
+        parent = state
+        while parent.parent:
+            hierarchy_depth += 1
+            assert parent.parent in variant.object_states # object parent is backstage??
+            parent = variant.object_states[parent.parent]
+        return hierarchy_depth
+    sorted_states = sorted(variant.object_states, key=hierarchy_depth)
+    for obj_state in sorted_states:
+        mat = obj_state.matrix_local
+        matrix_values = [str(mat[j][i]) for i in range(4) for j in range(4)]
+        output += "\t\t\to\t{}\n".format(obj_state.name)
+        output += "\t\t\t\tmat\t{}\n".format("\t".join(matrix_values))
+        output += "\t\t\t\tobj_type\t{}\n".format(obj_state.obj_type)
+        if obj_state.obj_subtype:
+            output += "\t\t\t\tobj_subtype\t{}\n".format(obj_state.obj_subtype)
+        output += "\t\t\t\tbounds\t{}\t{}\t{}\t{}\t{}\t{}\n".format(*obj_state.bounds.box_min, *obj_state.bounds.box_max)
+        output += "\t\t\t\tparent\t{}\n".format(obj_state.parent)
+        for c in obj_state.components_serialized:
+            output += "\t\t\t\tc\t{}\t{}\t{}\n".format(c.name, c.is_global, c.data.replace('\n', '\@\@'))
+    return output
+
+def serialize_room(room):
+    output = "\tr\t{}\t{}\t{}\t{}\t{}\n".format(room.name, room.location[0], room.location[1], room.size[0], room.size[1])
+    for variant in room.variants:
+        output += serialize_variant(variant)
+    return output
+
+def serialize_scene(scene):
+    output = "s\t{}\n".format(scene.name)
+    for room in scene.rooms:
+        output += serialize_room(room)
+    return output
+
+# this modifies the assetpath_to_guid_map with any new guids
+def deserialize_state(serialized, scene, room, variant, assetpath_to_guid_map):
+    assetpath_map = assetpath_to_guid_map
+    current_room = room
+    current_variant = variant
+    current_objstate = None
+    lines = serialized.split('\n')
+    for line in lines:
+        line = line.lstrip()
+        if line.startswith('s\t'):
+            scene_parts = line[2:].split('\t')
+            name = scene_parts[0]
+            scene = bpy.context.scene.smithy2d.scenes.get(name)
+            if not scene:
+                scene_assetpath = scene_dir_assetpath(name)
+                scene = bpy.context.scene.smithy2d.scenes.add()
+                scene.set_name(name)
+                scene.guid = assetpath_map.setdefault(scene_assetpath, str(uuid.uuid4()))
+            scene.rooms.clear()
+        elif line.startswith('r\t'):
+            room_parts = line[2:].split('\t')
+            name = room_parts[0]
+            room_assetpath = room_dir_assetpath(scene.name, name)
+            current_room = scene.rooms.get(name)
+            if not current_room:
+                current_room = scene.rooms.add()
+                current_room.set_name(name)
+                current_room.guid = assetpath_map.setdefault(room_assetpath, str(uuid.uuid4()))
+            current_room.variants.clear()
+            current_room.location[0] = float(room_parts[1])
+            current_room.location[1] = float(room_parts[2])
+            current_room.size[0] = float(room_parts[3])
+            current_room.size[1] = float(room_parts[4])
+            if len(scene.rooms) == 1:
+                scene.set_room(0) # select this room if it is the first one
+        elif line.startswith('v\t'):
+            variant_parts = line[2:].split('\t')
+            name = variant_parts[0]
+            variant_assetpath = room_script_assetpath(scene.name, current_room.name, name)
+            current_variant = current_room.variants.get(name)
+            if not current_variant:
+                current_variant = current_room.variants.add()
+                current_variant.set_name(name)
+                current_variant.guid = assetpath_map.setdefault(variant_assetpath, str(uuid.uuid4()))
+            current_variant.object_states.clear()
+            if len(current_room.variants) == 1:
+                current_room.set_variant(0) # select this variant if it is the first one
+        elif line.startswith('o\t'): 
+            obj_parts = line[2:].split('\t')
+            name = obj_parts[0]
+            current_objstate = current_variant.object_states.add()
+            current_objstate.name = name
+        elif line.startswith('mat\t'):
+            #TODO split into rows
+            mat_parts = line[4:].split('\t')
+            mat_values = [float(val) for val in mat_parts]
+            assert len(mat_values) == 16 # check if a valid matrix
+            current_objstate.matrix_local = mat_values
+        elif line.startswith('parent\t'):
+            parent = line[7:]
+            current_objstate.parent = parent
+        elif line.startswith('bounds\t'):
+            line_parts = line[7:].split('\t')
+            bounds_min = (float(line_parts[0]), float(line_parts[1]), float(line_parts[2]))
+            bounds_max = (float(line_parts[3]), float(line_parts[4]), float(line_parts[5]))
+            current_objstate.bounds.box_min = bounds_min
+            current_objstate.bounds.box_max = bounds_max
+        elif line.startswith('obj_type\t'):
+            current_objstate.obj_type = line[9:]
+        elif line.startswith('obj_subtype\t'):
+            current_objstate.obj_subtype = line[9:]
+        elif line.startswith('c\t'):
+            line_parts = line[2:].split('\t', 2)
+            name = line_parts[0]
+            c = current_objstate.components_serialized.add()
+            c.name = name
+            assert line_parts[1] in ["True", "False"] # check if valid bool
+            c.is_global = line_parts[1] == "True"
+            c.data = line_parts[2].replace('\@\@', '\n')
+

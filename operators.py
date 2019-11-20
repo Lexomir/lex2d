@@ -6,6 +6,7 @@ import bmesh
 import subprocess
 import traceback
 import mathutils
+from mathutils import Vector, Matrix, Quaternion
 from .utils import *
 from . import ObjUtils
 
@@ -1073,46 +1074,48 @@ class SyncWithAssetFolder(bpy.types.Operator):
 
         # find new assets on disk
         scenes_dir = asset_abspath("scripts/")
-        for scene_name in os.listdir(scenes_dir):
-            if scene_name != "core" and os.path.isdir(os.path.join(scenes_dir, scene_name)):
-                scene = context.scene.smithy2d.scenes.get(scene_name)
-                scene_assetpath = scene_dir_assetpath(scene_name)
-                scene_abspath = asset_abspath(scene_assetpath)
-                # add scene if it doesnt exist in the blendfile
-                if not scene:
-                    scene = context.scene.smithy2d.scenes.add()
-                    scene.name = scene_name
-                    scene.guid = get_or_create_assetpath_guid_binding(scene_assetpath, default_guid=create_guid())
-                    used_guids.add(scene.guid)
+        if os.path.exists(scenes_dir):
+            for scene_name in os.listdir(scenes_dir):
+                if scene_name != "core" and os.path.isdir(os.path.join(scenes_dir, scene_name)):
+                    scene = context.scene.smithy2d.scenes.get(scene_name)
+                    scene_assetpath = scene_dir_assetpath(scene_name)
+                    scene_abspath = asset_abspath(scene_assetpath)
+                    # add scene if it doesnt exist in the blendfile
+                    if not scene:
+                        scene = context.scene.smithy2d.scenes.add()
+                        scene.name = scene_name
+                        scene.guid = get_or_create_assetpath_guid_binding(scene_assetpath, default_guid=create_guid())
+                        used_guids.add(scene.guid)
 
-                # find new room assets on disk
-                for room_name in os.listdir(scene_abspath):
-                    if os.path.isdir(os.path.join(scene_abspath, room_name)):
-                        room = scene.rooms.get(room_name)
-                        room_assetpath = room_dir_assetpath(scene_name, room_name)
-                        room_abspath = asset_abspath(room_assetpath)
-                        # add room if it doesnt exist in the blendfile
-                        if not room:
-                            room = scene.rooms.add()
-                            room.name = room_name
-                            room.guid = assetpath_map.get(room_assetpath) or ""
-                            room.guid = get_or_create_assetpath_guid_binding(room_assetpath, default_guid=create_guid())
-                            used_guids.add(room.guid)
+                    # find new room assets on disk
+                    if os.path.exists(scene_abspath):
+                        for room_name in os.listdir(scene_abspath):
+                            if os.path.isdir(os.path.join(scene_abspath, room_name)):
+                                room = scene.rooms.get(room_name)
+                                room_assetpath = room_dir_assetpath(scene_name, room_name)
+                                room_abspath = asset_abspath(room_assetpath)
+                                # add room if it doesnt exist in the blendfile
+                                if not room:
+                                    room = scene.rooms.add()
+                                    room.name = room_name
+                                    room.guid = assetpath_map.get(room_assetpath) or ""
+                                    room.guid = get_or_create_assetpath_guid_binding(room_assetpath, default_guid=create_guid())
+                                    used_guids.add(room.guid)
 
-                        # find new variant assets on disk
-                        variants_dir = os.path.join(room_abspath, "states")
-                        if os.path.exists(variants_dir) and os.path.isdir(variants_dir):
-                            for variant_filename in os.listdir(variants_dir):
-                                variant_name, ext = os.path.splitext(variant_filename)
-                                if ext == ".lua":
-                                    variant = room.variants.get(variant_name)
-                                    variant_assetpath = room_script_assetpath(scene_name, room_name, variant_name)
-                                    # add variant if it doesnt exist in the blendfile
-                                    if not variant:
-                                        variant = room.variants.add()
-                                        variant.name = variant_name
-                                        variant.guid = get_or_create_assetpath_guid_binding(variant_assetpath, default_guid=create_guid())
-                                        used_guids.add(variant.guid)
+                                # find new variant assets on disk
+                                variants_dir = os.path.join(room_abspath, "states")
+                                if os.path.exists(variants_dir) and os.path.isdir(variants_dir):
+                                    for variant_filename in os.listdir(variants_dir):
+                                        variant_name, ext = os.path.splitext(variant_filename)
+                                        if ext == ".lua":
+                                            variant = room.variants.get(variant_name)
+                                            variant_assetpath = room_script_assetpath(scene_name, room_name, variant_name)
+                                            # add variant if it doesnt exist in the blendfile
+                                            if not variant:
+                                                variant = room.variants.add()
+                                                variant.name = variant_name
+                                                variant.guid = get_or_create_assetpath_guid_binding(variant_assetpath, default_guid=create_guid())
+                                                used_guids.add(variant.guid)
         # write changes to the guid map file
         if guid_map:
             tmp_guid_map_filepath = get_guid_mapfile() + ".tmp"
@@ -1123,6 +1126,256 @@ class SyncWithAssetFolder(bpy.types.Operator):
             os.replace(tmp_guid_map_filepath, guid_map_filepath)
 
         refresh_screen_area("PROPERTIES")
+        return {"FINISHED"}
+
+class ConvertBlendFileToSmithyUpdate(bpy.types.Operator):
+    bl_idname = "smithy2d.convert_file_to_smithy_update"
+    bl_label = "Convert BlendFile To Smithy Update"
+
+    def execute(self, context):    
+        def flatten(mat):
+            dim = len(mat)
+            return [mat[j][i] for i in range(dim) 
+                            for j in range(dim)]
+    
+        # adapt old data into new version 
+        for scene in bpy.context.scene.smithy2d.scenes:
+            for room in scene.rooms:
+                for variant in room.variants:
+                    for obj_state in variant.object_states:
+                        loc = Vector(obj_state.location)
+                        rot = Quaternion(obj_state.rotation_quaternion)
+                        scale = Vector(obj_state.scale)
+                        mat = rot.to_matrix().to_4x4() @ Matrix.Diagonal(scale).to_4x4()
+                        mat.translation = loc
+                        obj_state.matrix_local = flatten(mat)
+                        dim = obj_state.bounds.get_dimensions()
+                        obj_state.obj_type = "MESH" if dim[0] != 0 or dim[0] != 0 else "EMPTY"
+
+        return {"FINISHED"}
+
+
+class CopyVariantToClipboard(bpy.types.Operator):
+    bl_idname = "smithy2d.copy_variant_to_clipboard"
+    bl_label = "Copy Variant to clipboard"
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room() if scene else None
+        return room and room.get_active_variant()
+
+    def execute(self, context):
+        guid_map, assetpath_map = get_guids_maps_from_file()
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room()
+        variant = room.get_active_variant()
+        save_state((scene, room, variant))
+
+        serialized = serialize_variant(variant)
+        bpy.context.window_manager.clipboard = serialized
+
+        return {"FINISHED"}
+    
+    
+class CopyRoomToClipboard(bpy.types.Operator):
+    bl_idname = "smithy2d.copy_room_to_clipboard"
+    bl_label = "Copy Room to clipboard"
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene.smithy2d.get_active_scene()
+        return scene and scene.get_active_room()
+
+    def execute(self, context):
+        guid_map, assetpath_map = get_guids_maps_from_file()
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room()
+        variant = room.get_active_variant()
+        if variant:
+            save_state((scene, room, variant))
+
+        serialized = serialize_room(room)
+        bpy.context.window_manager.clipboard = serialized
+
+        return {"FINISHED"}
+    
+
+class CopySceneToClipboard(bpy.types.Operator):
+    bl_idname = "smithy2d.copy_scene_to_clipboard"
+    bl_label = "Copy Scene to clipboard"
+    
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene.smithy2d.get_active_scene()
+        return scene
+
+    def execute(self, context):
+        guid_map, assetpath_map = get_guids_maps_from_file()
+        scene = context.scene.smithy2d.get_active_scene()
+
+        room = scene.get_active_room()
+        variant = room.get_active_variant() if room else None
+        if variant:
+            save_state((scene, room, variant))
+        serialized = serialize_scene(scene)
+        bpy.context.window_manager.clipboard = serialized
+
+        return {"FINISHED"}
+
+class Smithy2D_PasteVariantFromClipboard(bpy.types.Operator):
+    bl_idname = "smithy2d.paste_variant_from_clipboard"
+    bl_label = "Paste Variant from clipboard"
+        
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room() if scene else None
+        return room
+
+    def execute(self, context):
+        guid_map, assetpath_map = get_guids_maps_from_file()
+
+        serialized = bpy.context.window_manager.clipboard
+
+        if not serialized.lstrip().startswith('v\t'):
+            self.report({"ERROR"}, "No Variant found in the clipboard")
+            return {"CANCELLED"}
+
+        scene = context.scene.smithy2d.get_active_scene()
+        room = scene.get_active_room() if scene else None
+        if not room:
+            self.report({"ERROR"}, "No active room to paste the variant into")
+            return {"CANCELLED"}
+
+        # get room name
+        first_line = serialized.split('\n', 1)[0].lstrip()
+        name = first_line.split('\t')[1].strip()
+
+        deserialize_state(serialized, scene=scene, room=room, variant=None, assetpath_to_guid_map=assetpath_map)
+
+        variant = room.variants.get(name)
+        if not variant:
+            self.report({"ERROR"}, "Variant failed to be created for some reason")
+            return {"CANCELLED"}
+
+        # if we just deserialized the active room, reload the state without saving
+        current_variant = room.get_active_variant()
+        if current_variant and current_variant.name == name:
+            load_state((scene, room, current_variant))
+        else:
+            room.set_variant_and_update(variant.index())
+
+        # write changes to the guid map file
+        if assetpath_map and bpy.data.filepath:
+            guid_map_filepath = get_guid_mapfile()
+            tmp_guid_map_filepath = guid_map_filepath + ".tmp"
+            with open(tmp_guid_map_filepath, "w") as tmp_guid_file:
+                for assetpath, guid in assetpath_map.items():
+                    tmp_guid_file.write("{}\t{}\n".format(guid, assetpath))
+            os.replace(tmp_guid_map_filepath, guid_map_filepath)
+
+        return {"FINISHED"}
+        
+class Smithy2D_PasteRoomFromClipboard(bpy.types.Operator):
+    bl_idname = "smithy2d.paste_room_from_clipboard"
+    bl_label = "Paste Room from clipboard"
+    
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene.smithy2d.get_active_scene()
+        return scene
+
+    def execute(self, context):
+        guid_map, assetpath_map = get_guids_maps_from_file()
+        serialized = bpy.context.window_manager.clipboard
+
+        if not serialized.lstrip().startswith('r\t'):
+            self.report({"ERROR"}, "No room found in the clipboard")
+            return {"CANCELLED"}
+
+        scene = context.scene.smithy2d.get_active_scene()
+        if not scene:
+            self.report({"ERROR"}, "No active scene to paste the room into")
+            return {"CANCELLED"}
+
+        # get room name
+        first_line = serialized.split('\n', 1)[0].lstrip()
+        name = first_line.split('\t')[1].strip()
+
+        deserialize_state(serialized, scene=scene, room=None, variant=None, assetpath_to_guid_map=assetpath_map)
+
+        room = scene.rooms.get(name)
+        if not room:
+            self.report({"ERROR"}, "Room failed to be created for some reason")
+            return {"CANCELLED"}
+
+        # if we just deserialized the active room, reload the state without saving
+        current_room = scene.get_active_room()
+        if current_room and current_room.name == name:
+            variant = current_room.get_active_variant()
+            if variant:
+                load_state((scene, room, variant))
+        else:
+            scene.set_room_and_update(room.index())
+
+        # write changes to the guid map file
+        if assetpath_map and bpy.data.filepath:
+            guid_map_filepath = get_guid_mapfile()
+            tmp_guid_map_filepath = guid_map_filepath + ".tmp"
+            with open(tmp_guid_map_filepath, "w") as tmp_guid_file:
+                for assetpath, guid in assetpath_map.items():
+                    tmp_guid_file.write("{}\t{}\n".format(guid, assetpath))
+            os.replace(tmp_guid_map_filepath, guid_map_filepath)
+
+        return {"FINISHED"}
+
+class Smithy2D_PasteSceneFromClipboard(bpy.types.Operator):
+    bl_idname = "smithy2d.paste_scene_from_clipboard"
+    bl_label = "Paste Scene to clipboard"
+    
+    @classmethod
+    def poll(cls, context):
+        return True
+
+    def execute(self, context):
+        guid_map, assetpath_map = get_guids_maps_from_file()
+        serialized = bpy.context.window_manager.clipboard
+
+        if not serialized.lstrip().startswith('s\t'):
+            self.report({"ERROR"}, "No scene found in the clipboard")
+            return {"CANCELLED"}
+
+        # get scene name
+        first_line = serialized.split('\n', 1)[0].lstrip()
+        name = first_line.split('\t')[1].strip()
+
+        deserialize_state(serialized, scene=None, room=None, variant=None, assetpath_to_guid_map=assetpath_map)
+
+        scene = context.scene.smithy2d.scenes.get(name)
+        if not scene:
+            self.report({"ERROR"}, "Scene failed to be created for some reason")
+            return {"CANCELLED"}
+
+
+        # if we just deserialized the active state, reload the state without saving
+        current_scene = context.scene.smithy2d.get_active_scene()
+        if current_scene and current_scene.name == name:
+            room = current_scene.get_active_room()
+            variant = room.get_active_variant() if room else None
+            load_state((current_scene, room, variant))
+        else:
+            context.scene.smithy2d.set_scene_and_update(scene.get_index())
+
+        # write changes to the guid map file
+        if assetpath_map and bpy.data.filepath:
+            guid_map_filepath = get_guid_mapfile()
+            tmp_guid_map_filepath = guid_map_filepath + ".tmp"
+            with open(tmp_guid_map_filepath, "w") as tmp_guid_file:
+                for assetpath, guid in assetpath_map.items():
+                    tmp_guid_file.write("{}\t{}\n".format(guid, assetpath))
+            os.replace(tmp_guid_map_filepath, guid_map_filepath)
+
         return {"FINISHED"}
 
 

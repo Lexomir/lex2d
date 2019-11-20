@@ -71,6 +71,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
     def copy_into(self, other_state):
         other_state.name = self.name
         other_state.obj_type = self.obj_type
+        other_state.obj_subtype = self.obj_subtype
         other_state.size = self.size
         other_state.topleft = self.topleft
         other_state.matrix_local = flatten(self.matrix_local)
@@ -99,6 +100,8 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
         self.bounds.set_from_object(obj)
         self.parent = obj.parent.name if obj.parent else ""
         self.obj_type = obj.type
+        if obj.type == "EMPTY":
+            self.obj_subtype = obj.empty_display_type
 
     # load state into the given object
     def load(self, obj):
@@ -126,11 +129,13 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
             # find the delta vertex movement of object (compare the top left bounding box of both states)
             bounds = ObjUtils.BoundingBox(obj)
             tl = bounds.get_bottombackleft()
-            new_tl = Vector(self.topleft)
+            new_tl = self.bounds.get_bottombackleft()
             vert_move_amt = new_tl - tl
             # shift the object (in order to move it's verts in the right spot), then set the object's origin
             ObjUtils.shift_verts(obj, vert_move_amt)
-
+        elif self.obj_type == "EMPTY" and self.obj_subtype:
+            obj.empty_display_type = self.obj_subtype
+            
     def store_data(self, identifier, str_data):
         data = self.custom_state_data.get(identifier)
         if not data:
@@ -148,21 +153,21 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
     location : bpy.props.FloatVectorProperty(size=3)
     scale : bpy.props.FloatVectorProperty(size=3)
     rotation_quaternion : bpy.props.FloatVectorProperty(size=4)
-    need_old_stuff : bpy.props.BoolProperty(default=True)
+    topleft : bpy.props.FloatVectorProperty(size=3)
+    dimensions : bpy.props.FloatVectorProperty(size=3)
+    custom_state_data : bpy.props.CollectionProperty(type=Smithy2D_LexStringProperty)
+    size : bpy.props.FloatVectorProperty(size=3)
 
     # properties
-    size : bpy.props.FloatVectorProperty(size=3)
     components_serialized : bpy.props.CollectionProperty(type=Smithy2D_SerializedComponent)
-    custom_state_data : bpy.props.CollectionProperty(type=Smithy2D_LexStringProperty)
-    topleft : bpy.props.FloatVectorProperty(size=3)
     matrix_local : bpy.props.FloatVectorProperty(
         name="Matrix",
         size=16,
         subtype="MATRIX")
-    dimensions : bpy.props.FloatVectorProperty(size=3)
     bounds : bpy.props.PointerProperty(type=ObjUtils.BpyBoundingBox)
     parent : bpy.props.StringProperty(default="")
     obj_type : bpy.props.StringProperty(default="MESH")
+    obj_subtype : bpy.props.StringProperty(default="ARROWS")
 
 class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
     def __str__(self):
