@@ -19,6 +19,7 @@ bl_info = {
     "author" : "lexomir",
     "description" : "",
     "blender" : (2, 80, 0),
+    "version" : (1, 0, 0),
     "location" : "",
     "warning" : "uh oh spaghetti-o's",
     "category" : "Scene"
@@ -91,20 +92,32 @@ _lex_suite_callbacks = []
 def add_lex_suite_registered_callback(callback):
     _lex_suite_callbacks.append(callback)
 
+@persistent
+def _on_blend_save_pre(context):
+    for bpy_scene in bpy.data.scenes:
+        bpy_scene.smithy2d.version = get_addon_version()
+
 
 @persistent
 def _on_blend_load_post(dummy):
-    if bpy.context.scene.smithy2d.scenes:
-        serialized_state = ""
-        for scene in bpy.context.scene.smithy2d.scenes:
-            serialized_state += "{}~\n".format(serialize_scene(scene))
-        state_outputfilepath = os.path.join(bpy.path.abspath("//"), ".lexeditor", "last_opened_state_info.txt")
-        os.makedirs(os.path.dirname(state_outputfilepath), exist_ok=True)
-        with open(state_outputfilepath, "w") as state_file:
-            state_file.write(serialized_state)
-
-    # sync with the assets on drive
     if bpy.data.filepath:
+        # write the "last_opened_state_info.txt" file
+        if bpy.context.scene.smithy2d.scenes:
+            serialized_state = ""
+            for scene in bpy.context.scene.smithy2d.scenes:
+                serialized_state += "{}~\n".format(serialize_scene(scene))
+            state_outputfilepath = os.path.join(bpy.path.abspath("//"), ".lexeditor", "last_opened_state_info.txt")
+            os.makedirs(os.path.dirname(state_outputfilepath), exist_ok=True)
+            with open(state_outputfilepath, "w") as state_file:
+                state_file.write(serialized_state)
+    
+        # check version
+        version_on_file = bpy.context.scene.smithy2d.version
+        current_version = get_addon_version()
+        if addon_has_breaking_changes(version_on_file, current_version):
+            bpy.ops.smithy2d.update_assets_to_addon_version("INVOKE_DEFAULT", old_version=version_on_file, new_version=current_version)
+
+        # sync with the assets on drive
         bpy.ops.smithy2d.sync_with_asset_folder()
 
     for im in bpy.data.images:
@@ -122,8 +135,10 @@ def _lex_suite_registered(lex_suite_module):
         cb(lex_suite_module)
 
     bpy.app.handlers.load_post.append(_on_blend_load_post)
+    bpy.app.handlers.save_pre.append(_on_blend_save_pre)
 
 
 def _lex_suite_unregistered(lex_suite_module):
     bpy.app.handlers.load_post.remove(_on_blend_load_post)
+    bpy.app.handlers.save_pre.remove(_on_blend_save_pre)
     auto_load.unregister()

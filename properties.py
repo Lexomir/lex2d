@@ -533,6 +533,7 @@ class Smithy2D_ScenePropertyGroup(bpy.types.PropertyGroup):
 
     active_scene_index : bpy.props.IntProperty(set=set_scene_and_update, get=get_scene)
     scenes : bpy.props.CollectionProperty(type=Smithy2D_Scene)
+    version : bpy.props.IntVectorProperty(size=3, default=[0, 0, 0])
 
 
 def register():

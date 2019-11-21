@@ -7,6 +7,33 @@ import bmesh
 from mathutils import Vector, Matrix, Quaternion
 import time
 
+def get_addon_version():
+    version = sys.modules["lex2d"].bl_info['version']
+    return version
+
+def version_compare(version1, version2):
+    version_change = version2[0] - version1[0]
+    if version_change < 0: 
+        return -1
+    elif version_change == 0: 
+        return version_compare(version1[1:], version2[1:]) if len(version1) > 1 else 0
+    else: 
+        return 1
+
+def addon_has_breaking_changes(old_version, new_version):
+    break_versions = [
+        (1,0,0)]
+    old_version = tuple(old_version)
+    new_version = tuple(new_version)
+    if old_version == new_version:
+        return False
+    for bv in break_versions:
+        starts_before_break = version_compare(old_version, bv) > 0
+        ends_after_break = version_compare(bv, new_version) >= 0
+        if starts_before_break and ends_after_break:
+            return True
+    return False
+
 def refresh_screen_area(area_type):
     if bpy.context.screen:
         for area in bpy.context.screen.areas:
@@ -183,7 +210,6 @@ def switch_state(old_state, new_state):
     
     refresh_screen_area("PROPERTIES")
     refresh_screen_area("IMAGE_EDITOR")
-
 
 def set_active_material_output(my_node):
     nodes = my_node.id_data.nodes
@@ -438,6 +464,8 @@ def create_room_script(scene_name, room_name, variant_name):
     except:
         return None
 
+# Asset Directories
+# ---------------------------  
 # get filepath relative to the image folder
 def get_image_dir():
     return "//gamedata/img/"
@@ -578,7 +606,6 @@ def get_unique_variant_name(scene_name, room_name, variant_basename):
             final_name = variant_basename + "_" + str(i)
     return final_name
 
-
 def get_guids_maps_from_file():
     guid_map = {}
     assetpath_map = {}
@@ -595,8 +622,9 @@ def get_guids_maps_from_file():
                 guid_map[guid] = assetpath
                 assetpath_map[assetpath] = guid
     return guid_map, assetpath_map
-            
 
+# Serializing State
+# ---------------------------  
 def serialize_variant(variant):
     output = "\t\tv\t{}\n".format(variant.name)
 
@@ -613,6 +641,9 @@ def serialize_variant(variant):
         mat = obj_state.matrix_local
         matrix_values = [str(mat[j][i]) for i in range(4) for j in range(4)]
         output += "\t\t\to\t{}\n".format(obj_state.name)
+        output += "\t\t\t\tlocation\t{}\t{}\t{}\n".format(*obj_state.location)
+        output += "\t\t\t\trotation_quaternion\t{}\t{}\t{}\t{}\n".format(*obj_state.rotation_quaternion)
+        output += "\t\t\t\tscale\t{}\t{}\t{}\n".format(*obj_state.scale)
         output += "\t\t\t\tmat\t{}\n".format("\t".join(matrix_values))
         output += "\t\t\t\tobj_type\t{}\n".format(obj_state.obj_type)
         if obj_state.obj_subtype:

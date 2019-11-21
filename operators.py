@@ -1128,33 +1128,6 @@ class SyncWithAssetFolder(bpy.types.Operator):
         refresh_screen_area("PROPERTIES")
         return {"FINISHED"}
 
-class ConvertBlendFileToSmithyUpdate(bpy.types.Operator):
-    bl_idname = "smithy2d.convert_file_to_smithy_update"
-    bl_label = "Convert BlendFile To Smithy Update"
-
-    def execute(self, context):    
-        def flatten(mat):
-            dim = len(mat)
-            return [mat[j][i] for i in range(dim) 
-                            for j in range(dim)]
-    
-        # adapt old data into new version 
-        for scene in bpy.context.scene.smithy2d.scenes:
-            for room in scene.rooms:
-                for variant in room.variants:
-                    for obj_state in variant.object_states:
-                        loc = Vector(obj_state.location)
-                        rot = Quaternion(obj_state.rotation_quaternion)
-                        scale = Vector(obj_state.scale)
-                        mat = rot.to_matrix().to_4x4() @ Matrix.Diagonal(scale).to_4x4()
-                        mat.translation = loc
-                        obj_state.matrix_local = flatten(mat)
-                        dim = obj_state.bounds.get_dimensions()
-                        obj_state.obj_type = "MESH" if dim[0] != 0 or dim[0] != 0 else "EMPTY"
-
-        return {"FINISHED"}
-
-
 class CopyVariantToClipboard(bpy.types.Operator):
     bl_idname = "smithy2d.copy_variant_to_clipboard"
     bl_label = "Copy Variant to clipboard"
@@ -1176,7 +1149,6 @@ class CopyVariantToClipboard(bpy.types.Operator):
         bpy.context.window_manager.clipboard = serialized
 
         return {"FINISHED"}
-    
     
 class CopyRoomToClipboard(bpy.types.Operator):
     bl_idname = "smithy2d.copy_room_to_clipboard"
@@ -1200,7 +1172,6 @@ class CopyRoomToClipboard(bpy.types.Operator):
 
         return {"FINISHED"}
     
-
 class CopySceneToClipboard(bpy.types.Operator):
     bl_idname = "smithy2d.copy_scene_to_clipboard"
     bl_label = "Copy Scene to clipboard"
