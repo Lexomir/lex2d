@@ -167,7 +167,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
     bounds : bpy.props.PointerProperty(type=ObjUtils.BpyBoundingBox)
     parent : bpy.props.StringProperty(default="")
     obj_type : bpy.props.StringProperty(default="MESH")
-    obj_subtype : bpy.props.StringProperty(default="ARROWS")
+    obj_subtype : bpy.props.StringProperty(default="SINGLE_ARROW")
 
 class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
     def __str__(self):
@@ -533,7 +533,7 @@ class Smithy2D_ScenePropertyGroup(bpy.types.PropertyGroup):
 
     active_scene_index : bpy.props.IntProperty(set=set_scene_and_update, get=get_scene)
     scenes : bpy.props.CollectionProperty(type=Smithy2D_Scene)
-    version : bpy.props.IntVectorProperty(size=3, default=[0, 0, 0])
+    version : bpy.props.IntVectorProperty(size=3, default=get_addon_version())
 
 
 def register():

@@ -736,7 +736,7 @@ def deserialize_state(serialized, scene, room, variant, assetpath_to_guid_map):
         elif line.startswith('obj_type\t'):
             current_objstate.obj_type = line[9:]
         elif line.startswith('obj_subtype\t'):
-            current_objstate.obj_subtype = line[9:]
+            current_objstate.obj_subtype = line[12:].strip()
         elif line.startswith('c\t'):
             line_parts = line[2:].split('\t', 2)
             name = line_parts[0]

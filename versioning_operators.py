@@ -21,7 +21,7 @@ def update_variant_to_1_0_0(variant):
             obj_state.matrix_local = flatten(mat)
             dim = obj_state.bounds.get_dimensions()
             obj_state.obj_type = "MESH" if dim[0] != 0 or dim[0] != 0 else "EMPTY"
-            obj_state.obj_subtype = "ARROWS"
+            obj_state.obj_subtype = "SINGLE_ARROW"
 
 class Smithy2D_ConvertActiveSceneToAddonVersion(bpy.types.Operator):
     bl_idname = "smithy2d.update_active_scene_to_addon_version"

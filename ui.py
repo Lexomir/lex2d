@@ -95,11 +95,14 @@ class Smithy2D_OpenComponentScriptExternal(bpy.types.Operator):
     
     @classmethod
     def poll(self, context):
-        c_index = context.object.smithy2d.active_component_index
         c = None
-        if 0 <= c_index < len(context.object.smithy2d.components):
-            c = context.object.smithy2d.components[c_index]
-        return context.object and c and c.name != ""
+        if context.object:
+            c_index = context.object.smithy2d.active_component_index
+            c = None
+            if 0 <= c_index < len(context.object.smithy2d.components):
+                c = context.object.smithy2d.components[c_index]
+            return c and c.name != ""
+        return False
 
     def execute(self, context):
         if not bpy.data.filepath:
