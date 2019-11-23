@@ -317,7 +317,7 @@ def set_material_image_texture(obj, image_filepath, tile_size=None):
     tile_count_y = round(image.size[1] / tile_size[1], 3)
 
     # set scale
-    if bpy.app.version >= (2, 82, 0):
+    if bpy.app.version >= (2, 81, 0):
         mapping_node.inputs[3].default_value[0] = tile_count_x
         mapping_node.inputs[3].default_value[1] = tile_count_y
     else:
