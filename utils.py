@@ -628,15 +628,7 @@ def get_guids_maps_from_file():
 def serialize_variant(variant):
     output = "\t\tv\t{}\n".format(variant.name)
 
-    def hierarchy_depth(state):
-        hierarchy_depth = 0
-        parent = state
-        while parent.parent:
-            hierarchy_depth += 1
-            assert parent.parent in variant.object_states # object parent is backstage??
-            parent = variant.object_states[parent.parent]
-        return hierarchy_depth
-    sorted_states = sorted(variant.object_states, key=hierarchy_depth)
+    sorted_states = variant.get_sorted_object_states()
     for obj_state in sorted_states:
         mat = obj_state.matrix_local
         matrix_values = [str(mat[j][i]) for i in range(4) for j in range(4)]

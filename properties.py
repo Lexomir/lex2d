@@ -238,9 +238,20 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
                 state.name = o.name
                 state.save(o)
     
+    def get_sorted_object_states(self):
+        def hierarchy_depth(state):
+            hierarchy_depth = 0
+            parent = state
+            while parent.parent:
+                hierarchy_depth += 1
+                assert parent.parent in self.object_states # object parent is backstage??
+                parent = self.object_states[parent.parent]
+            return hierarchy_depth
+        return sorted(self.object_states, key=hierarchy_depth)
+
     def load_scene_state(self, bpy_scene):
         prev_objects = bpy.data.objects.keys()
-        for state in self.object_states:
+        for state in self.get_sorted_object_states():
             obj = get_or_create_object(state.name, state.obj_type)
             move_onstage(obj)
             state.load(obj)
