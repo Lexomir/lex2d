@@ -9,6 +9,7 @@ import mathutils
 from mathutils import Vector, Matrix, Quaternion
 from .utils import *
 from . import ObjUtils
+from .ecs import component_system 
 
 
 class SetTextureFromFileBrowser(bpy.types.Operator):
@@ -436,6 +437,8 @@ def rename_room_directory(scene_name, old_name, name):
         else:
             print("Smithy2D - Warning: Renaming a room but the original directory could not be found ('{}')".format(old_room_dir_abspath))
             os.makedirs(new_room_dir_abspath)
+
+        component_system.rename_asset(old_room_dir_assetpath, new_room_dir_assetpath)
         
         # rename the room and its assets in the guid file
         guid_map_filepath = get_guid_mapfile()
@@ -465,8 +468,10 @@ def rename_variant_script(scene_name, room_name, old_variant_name, new_variant_n
             os.rename(old_script_filepath, new_script_filepath)
         else:
             print("Smithy2D - Warning: Renaming a Variant but the original script could not be found ('{}')".format(old_script_filepath))
+        
+        component_system.rename_asset(old_assetpath, new_assetpath)
 
-        # rename the variant
+        # rename the variant in the guid file
         guid_map_filepath = get_guid_mapfile()
         tmp_guid_map_filepath = guid_map_filepath + ".tmp"
         with open(guid_map_filepath, "r") as guid_file:
@@ -494,6 +499,8 @@ def rename_scene(old_scene_name, new_scene_name):
         else:
             print("Smithy2D - Warning: Renaming a Scene but the original directory could not be found ('{}')".format(old_scene_dir_abspath))
         
+        component_system.rename_asset(old_scene_dir_assetpath, new_scene_assetpath)
+
         # rename the scene and its assets in the guid file
         guid_map_filepath = get_guid_mapfile()
         tmp_guid_map_filepath = guid_map_filepath + ".tmp"

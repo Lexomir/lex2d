@@ -125,6 +125,21 @@ _components = {}
 def get_or_create_component(assetpath):
     return _components.setdefault(assetpath, Component(assetpath))
 
+# rename any component at or within the given assetpath
+def rename_asset(old_assetpath, new_assetpath):
+    assets = [ap for ap in _components if old_assetpath in ap]
+    for c_assetpath in assets:
+        new_c_assetpath = c_assetpath.replace(old_assetpath, new_assetpath, 1)
+        if c_assetpath != new_c_assetpath:
+            _components[new_c_assetpath] = _components[c_assetpath]
+            del _components[c_assetpath]
+
+# remove all asset at or within the given assetpath
+def remove_asset(assetpath):
+    remove_assets = [ap for ap in _components if old_assetpath in ap]
+    for c_assetpath in remove_assets:
+        del _components[c_assetpath]
+
 def get_component(assetpath):
     return _components.get(assetpath)
 
