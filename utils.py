@@ -110,14 +110,18 @@ def find_map_editor_areas():
                 map_editors.append(area)
     return map_editors
 
+def create_object(obj_name, obj_type):
+    data = None
+    if obj_type == "MESH":
+        data = bpy.data.meshes.new(obj_name)
+    print("Cant find '{}' so making it".format(obj_name))
+    obj = bpy.data.objects.new(obj_name, data)
+    return obj
+
 def get_or_create_object(obj_name, obj_type):
     obj = bpy.data.objects.get(obj_name)
     if not obj or obj_type != obj.type:
-        data = None
-        if obj_type == "MESH":
-            data = bpy.data.meshes.new(obj_name)
-        print("Cant find '{}' so making it".format(obj_name))
-        obj = bpy.data.objects.new(obj_name, data)
+        obj = create_object(obj_name, obj_type)
     return obj
 
 def is_backstage(obj):
@@ -125,20 +129,24 @@ def is_backstage(obj):
     return backstage and obj.name in backstage.objects 
 
 def move_backstage(obj):
-    if obj.name in bpy.context.scene.collection.objects:
-        bpy.context.scene.collection.objects.unlink(obj)
-    for c in bpy.data.collections:
-        if obj.name in c.objects:
-            c.objects.unlink(obj)
-
+    # get or create the Backstage collection 
     backstage = bpy.data.collections.get("Backstage")
     if not backstage:
         backstage = bpy.data.collections.new("Backstage")
+        backstage.hide_viewport = True
     if not "Backstage" in bpy.context.scene.collection.children:
         bpy.context.scene.collection.children.link(backstage)
 
-    backstage.hide_viewport = True
-    backstage.objects.link(obj)
+    obj_collections = obj.users_collection
+
+    # remove object from other collections
+    for c in (c for c in obj_collections if c != backstage):
+        c.objects.unlink(obj)
+    
+    # add the object to backstage
+    if backstage not in obj_collections:
+        backstage.objects.link(obj)
+
 
 def move_onstage(obj):
     backstage = bpy.data.collections.get("Backstage")
@@ -180,9 +188,16 @@ def load_state(state):
 def switch_state(old_state, new_state):
     old_scene, old_room, old_variant = old_state
     scene, room, variant = new_state
+    old_scene.dirty = True
+    scene.dirty = True
+
+    # get into object mode first
+    if bpy.context.object and bpy.context.object.mode != "OBJECT":
+        bpy.ops.object.mode_set(mode="OBJECT", toggle=False)
 
     def name(item):
         return item.name if item else "_"
+
     print("Switching from {}:{}:{} to {}:{}:{}".format(
         name(old_scene), name(old_room), name(old_variant), 
         name(scene), name(room), name(variant)))
@@ -232,18 +247,14 @@ def find_texture_node_with_image(nodes, image):
             return node
 
 def apply_bmesh_to_object(obj, bm):
-    active_obj = bpy.context.window.view_layer.objects.active
-    bpy.context.window.view_layer.objects.active = obj
-    mode = bpy.context.mode
-    bpy.ops.object.mode_set(mode='OBJECT')
     bm.to_mesh(obj.data)
-    bpy.ops.object.mode_set(mode=mode)
-    bpy.context.window.view_layer.objects.active = active_obj
 
-def get_or_create_texture_node(nodes, image):
+def get_or_create_texture_node(nodes, image=None, image_path=None):
     for node in nodes:
-        if node.type == 'TEX_IMAGE' and node.image == image and node.image.colorspace_settings.name == 'sRGB':
-            return node
+        if node.type == 'TEX_IMAGE':
+            if (image and node.image == image) or (image_path and node.image and node.image.filepath):
+                if node.image.colorspace_settings.name == 'sRGB':
+                    return node
     node = nodes.new("ShaderNodeTexImage")
     node.image = image
     node.image.colorspace_settings.name = 'sRGB'
@@ -282,16 +293,18 @@ def remove_all_except(bpy_collection, exceptions):
         if item not in exceptions:
             bpy_collection.remove(item)
 
-def set_material_image_texture(obj, image_filepath, tile_size=None):
-    # import image file
-    image = bpy.data.images.load(bpy.path.relpath(image_filepath), check_existing=True)
+def create_image_material(image_imgpath, tile_size=None):
+    image_imgpath = image_imgpath.replace("\\", "/")
+    img_relpath = bpy.path.relpath(image_abspath(image_imgpath))
 
-    material = bpy.data.materials.get(obj.name)
+    # find or create material (will overwrite if it exists)
+    material = bpy.data.materials.get(image_imgpath)
     if not material:
-        material = bpy.data.materials.new(obj.name)
+        material = bpy.data.materials.new(image_imgpath)
+
+    # setup material nodes
     material.use_nodes = True
     material.blend_method = 'CLIP'
-
     mat_output = get_active_material_output(material.node_tree.nodes)
 
     # start from scratch if the output isnt connected to an emission node
@@ -302,6 +315,8 @@ def set_material_image_texture(obj, image_filepath, tile_size=None):
     emission_node = get_or_create_input_node(material.node_tree, mix_node, "ShaderNodeEmission", "Emission", 2)
     transparent_node = get_or_create_input_node(material.node_tree, mix_node, "ShaderNodeBsdfTransparent", "BSDF", 1)
 
+    # connect the texture node
+    image = bpy.data.images.load(img_relpath, check_existing=True)
     texture_node = get_or_create_texture_node(material.node_tree.nodes, image=image)
     material.node_tree.links.new(emission_node.inputs["Color"], texture_node.outputs["Color"])
     material.node_tree.links.new(mix_node.inputs[0], texture_node.outputs['Alpha'])
@@ -323,34 +338,41 @@ def set_material_image_texture(obj, image_filepath, tile_size=None):
     else:
         mapping_node.scale[0] = tile_count_x
         mapping_node.scale[1] = tile_count_y
-
-    # Assign it to object
-    if obj.data.materials:
-        # assign to 1st material slot
-        obj.data.materials[0] = material
-    else:
-        # no slots
-        obj.data.materials.append(material)
-    
     return material, texture_node
 
-def clear_material_image(obj):
-    material = bpy.data.materials.get(obj.name)
+def get_or_create_image_material(image_imgpath, tile_size=None):
+    image_imgpath = image_imgpath.replace("\\", "/")
+    img_relpath = bpy.path.relpath(image_abspath(image_imgpath))
+
+    material = bpy.data.materials.get(image_imgpath)
+
+    # setup the material nodes to use the image
     if not material:
-        material = bpy.data.materials.new(obj.name)
-    material.use_nodes = True
-    material.blend_method = 'CLIP'
+        material, _ = create_image_material(image_imgpath, tile_size=tile_size)
 
-    mat_output = get_active_material_output(material.node_tree.nodes)
-    color_node = get_or_create_input_node(material.node_tree, mat_output, 'ShaderNodeRGB', "Color", "Surface")
-    color_node.outputs[0].default_value = [0.500000, 0.037542, 0.279409, 1.000000]
+    return material
 
-    # Assign it to object
-    if obj.data.materials:
-        # assign to 1st material slot
-        obj.data.materials[0] = material
-    else:
-        # no slots
+def assign_material_to_object(obj, material):
+    # Assign it to object if it isn't already (or isnt in the first slot)
+    if not obj.data.materials or obj.data.materials[0] != material:
+        obj.data.materials.clear()
+        obj.data.materials.append(material)
+
+def clear_material_image(obj):
+    bad_texture_name = "SMITHY2D_BAD_TEXTURE"
+    material = bpy.data.materials.get(bad_texture_name)
+    if not material:
+        material = bpy.data.materials.new(bad_texture_name)
+        material.use_nodes = True
+        material.blend_method = 'CLIP'
+
+        mat_output = get_active_material_output(material.node_tree.nodes)
+        color_node = get_or_create_input_node(material.node_tree, mat_output, 'ShaderNodeRGB', "Color", "Surface")
+        color_node.outputs[0].default_value = [0.500000, 0.037542, 0.279409, 1.000000]
+    
+    # Assign it to object if it isn't already (or isnt in the first slot)
+    if not obj.data.materials or obj.data.materials[0] != material:
+        obj.data.materials.clear()
         obj.data.materials.append(material)
     
     return material
@@ -375,7 +397,7 @@ def find_spritesheet_data_for_image(image_filepath):
     abs_image_dir = os.path.dirname(abs_image_filepath)
     abs_spritesheet_filepath = os.path.join(abs_image_dir, "definitions", "spritesheets.txt")
 
-    rel_image_filepath = os.path.relpath(abs_image_filepath, start=bpy.path.abspath(get_asset_dir()))
+    rel_image_filepath = os.path.relpath(abs_image_filepath, start=bpy.path.abspath(get_gamedata_dir()))
     try:
         with open(abs_spritesheet_filepath, "r") as spritesheet_file:
             for line in spritesheet_file:
@@ -443,20 +465,25 @@ def update_active_object(context):
 def is_renderable(obj_state):
     return not vec3_approx_equals(obj_state.bounds.get_dimensions(), (0, 0, 0))
 
-def room_script_exists(scene_name, room_name, variant_name):
-    script_filepath = asset_abspath(room_script_assetpath(scene_name, room_name, variant_name))
+def variant_script_exists(scene_name, room_name, variant_name):
+    script_filepath = asset_abspath(variant_script_assetpath(scene_name, room_name, variant_name))
     return os.path.exists(script_filepath)
 
-def create_room_script(scene_name, room_name, variant_name):
+def create_variant_script(scene_name, room_name, variant_name):
     try:
         template_filepath = os.path.normpath(os.path.abspath(os.path.dirname(__file__) + "/ecs/templates/smithy_state_script_template.txt"))
         with open(template_filepath, "r") as template_file:
             script_template = template_file.read()
 
-        output_filepath = asset_abspath(room_script_assetpath(scene_name, room_name, variant_name))
-        os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
-        print("Making State Script: ", output_filepath)
+        # insert keyword tokens
+        script_template = script_template.replace("%SCENE%", scene_name)
+        script_template = script_template.replace("%ROOM%", room_name)
+        script_template = script_template.replace("%VARIANT%", variant_name)
 
+        # write the script template to file
+        output_filepath = asset_abspath(variant_script_assetpath(scene_name, room_name, variant_name))
+        print("Making State Script: ", output_filepath)
+        os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
         with open(output_filepath, "w") as script_file:
             script_file.write(script_template)
 
@@ -470,14 +497,20 @@ def create_room_script(scene_name, room_name, variant_name):
 def get_image_dir():
     return "//gamedata/img/"
 
-def get_asset_dir():
+def get_gamedata_dir():
     return "//gamedata/"
+
+def get_asset_dir():
+    return "//gamedata/assets/"
 
 def asset_abspath(assetpath):
     return "{}gamedata/assets/{}".format(bpy.path.abspath("//").replace('\\', '/'), assetpath)
 
 def asset_archive_abspath(assetpath):
     return "{}.lexeditor/.tmp/gamedata/assets/{}".format(bpy.path.abspath("//").replace('\\', '/'), assetpath)
+
+def image_abspath(imgpath):
+    return "{}gamedata/img/{}".format(bpy.path.abspath("//").replace('\\', '/'), imgpath)
 
 def global_component_assetpath(component_name):
     return "scripts/core/components/{}.lua".format(component_name)
@@ -499,11 +532,11 @@ def component_idpath(assetpath):
     else:
         return "{}/{}/{}".format(scene, room, component)
 
-def room_script_assetpath(scene_name, room_name, variant_name):
-    return "scripts/{}/{}/states/{}.lua".format(scene_name, room_name, variant_name)
-
 def asset_scriptpath(assetpath):
     return os.path.relpath(assetpath, start="scripts").replace('\\', '/')
+
+def variant_script_assetpath(scene_name, room_name, variant_name):
+    return "scripts/{}/{}/states/{}.lua".format(scene_name, room_name, variant_name)
 
 def room_dir_assetpath(scene_name, room_name):
     return "scripts/{}/{}".format(scene_name, room_name)
@@ -511,8 +544,8 @@ def room_dir_assetpath(scene_name, room_name):
 def scene_dir_assetpath(scene_name):
     return "scripts/{}".format(scene_name)
 
-def room_scriptpath(scene_name, room_name, variant_name):
-    return asset_scriptpath(room_script_assetpath(scene_name, room_name, variant_name))
+def variant_scriptpath(scene_name, room_name, variant_name):
+    return asset_scriptpath(variant_script_assetpath(scene_name, room_name, variant_name))
 
 def valid_scene_assetpath(assetpath):
     asset_normpath = os.path.normpath(assetpath)
@@ -598,7 +631,7 @@ def get_unique_variant_name(scene_name, room_name, variant_basename):
     i = 0
     found_name = False
     while not found_name:
-        variant_script_filepath = asset_abspath(room_script_assetpath(scene_name, room_name, final_name))
+        variant_script_filepath = asset_abspath(variant_script_assetpath(scene_name, room_name, final_name))
         if not os.path.exists(variant_script_filepath):
             found_name = True
         else:  
@@ -676,6 +709,7 @@ def deserialize_state(serialized, scene, room, variant, assetpath_to_guid_map):
                 scene = bpy.context.scene.smithy2d.scenes.add()
                 scene.set_name(name)
                 scene.guid = assetpath_map.setdefault(scene_assetpath, str(uuid.uuid4()))
+            scene.dirty = True
             scene.rooms.clear()
         elif line.startswith('r\t'):
             room_parts = line[2:].split('\t')
@@ -696,7 +730,7 @@ def deserialize_state(serialized, scene, room, variant, assetpath_to_guid_map):
         elif line.startswith('v\t'):
             variant_parts = line[2:].split('\t')
             name = variant_parts[0]
-            variant_assetpath = room_script_assetpath(scene.name, current_room.name, name)
+            variant_assetpath = variant_script_assetpath(scene.name, current_room.name, name)
             current_variant = current_room.variants.get(name)
             if not current_variant:
                 current_variant = current_room.variants.add()

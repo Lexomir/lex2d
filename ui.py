@@ -148,14 +148,18 @@ class Smithy2D_NewComponentScript(bpy.types.Operator):
                 component_template = template_file.read()
             
             scene = context.scene.smithy2d.get_active_scene()
-            output_filepath = asset_abspath(bpy_component.get_assetpath(scene, scene.get_active_room()))
+            room = scene.get_active_room()
+            assetpath = bpy_component.get_assetpath(scene, room)
+            output_filepath = asset_abspath(assetpath)
 
             os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
             print("Making component: ", output_filepath)
 
             with open(output_filepath, "w") as script_file:
                 component_name = bpy_component.name
+                script_context = "{}/{}".format(scene.name, room.name) if not bpy_component.is_global else "Core"
                 parsed_template = component_template.replace("${COMPONENT_NAME}", component_name)
+                parsed_template = parsed_template.replace("${CONTEXT}", script_context)
                 script_file.write(parsed_template)
             
             return component_name

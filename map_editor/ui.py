@@ -156,7 +156,7 @@ class Smithy2D_MT_variant_list_options(bpy.types.Menu):
         scene = context.scene.smithy2d.get_active_scene()
         room = scene.get_active_room()
         variant = room.get_active_variant() 
-        assetpath = room_script_assetpath(scene.name, room.name, variant.name if variant else "_") 
+        assetpath = variant_script_assetpath(scene.name, room.name, variant.name if variant else "_") 
         variant_path = asset_abspath(assetpath)
         layout.operator("smithy2d.show_path_in_explorer", text="Open In Explorer").path = variant_path
         layout.operator("smithy2d.copy_variant_to_clipboard", text="Copy Variant")

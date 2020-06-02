@@ -101,7 +101,7 @@ def _on_blend_save_pre(context):
 @persistent
 def _on_blend_load_post(dummy):
     if bpy.data.filepath:
-        # write the "last_opened_state_info.txt" file
+        # write the "last_opened_state_info.txt" file (TODO: why do i need this??)
         if bpy.context.scene.smithy2d.scenes:
             serialized_state = ""
             for scene in bpy.context.scene.smithy2d.scenes:

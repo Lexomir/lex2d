@@ -59,14 +59,41 @@ def flatten(mat):
     dim = len(mat)
     return [mat[j][i] for i in range(dim) 
                     for j in range(dim)]
+
+def get_bpy_parent(bpy_prop):
+    bpy_scene = bpy_prop.id_data
+    path = bpy_prop.path_from_id().rsplit('.', 1)[0]
+    return bpy_scene.path_resolve(path)
+
 class Smithy2D_ObjectState(bpy.types.PropertyGroup):
     def get_name(self):
         return self.name
 
     def get_variant(self):
+        variant = get_bpy_parent(self)
+        return variant
+
+    # more efficient than calling "get_variant().get_room()", etc (only calls path_from_id once)
+    def get_variant_room_scene(self):
         bpy_scene = self.id_data
-        room = bpy_scene.path_resolve(".".join(self.path_from_id().split('.')[0:-1]))
-        return room
+        path = self.path_from_id()
+
+        pos_start = path.find('[', 0) + 1
+        pos_end = path.find(']', pos_start)
+        idx = int(path[pos_start:pos_end])
+        scene = bpy_scene.smithy2d.scenes[idx]
+
+        pos_start = path.find('[', pos_start) + 1
+        pos_end = path.find(']', pos_start)
+        idx = int(path[pos_start:pos_end])
+        room = scene.rooms[idx]
+
+        pos_start = path.find('[', pos_start) + 1
+        pos_end = path.find(']', pos_start)
+        idx = int(path[pos_start:pos_end])
+        variant = room.variants[idx]
+
+        return variant, room, scene
 
     def copy_into(self, other_state):
         other_state.name = self.name
@@ -104,9 +131,7 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
             self.obj_subtype = obj.empty_display_type
 
     # load state into the given object
-    def load(self, obj):
-        room = self.get_variant().get_room()
-        scene = room.get_scene()
+    def load(self, variant, room, scene, obj):
         component_system = obj.smithy2d.get_component_system()
         obj.smithy2d.components.clear()
         for new_sc in self.components_serialized:
@@ -117,22 +142,16 @@ class Smithy2D_ObjectState(bpy.types.PropertyGroup):
         obj.matrix_parent_inverse = Matrix()
         obj.matrix_local = self.matrix_local
         obj.parent = bpy.data.objects.get(self.parent)
-        
         if obj.type == "MESH":
             # Regenerate mesh data
             mesh_size = self.bounds.get_dimensions()
             mesh_size = (mesh_size[0], mesh_size[1])
             bm = create_rectangle_bmesh(mesh_size)
+            new_tl = self.bounds.get_bottombackleft()
+            for v in bm.verts:
+                v.co += new_tl
             apply_bmesh_to_object(obj, bm)
             bm.free()
-
-            # find the delta vertex movement of object (compare the top left bounding box of both states)
-            bounds = ObjUtils.BoundingBox(obj)
-            tl = bounds.get_bottombackleft()
-            new_tl = self.bounds.get_bottombackleft()
-            vert_move_amt = new_tl - tl
-            # shift the object (in order to move it's verts in the right spot), then set the object's origin
-            ObjUtils.shift_verts(obj, vert_move_amt)
         elif self.obj_type == "EMPTY" and self.obj_subtype:
             obj.empty_display_type = self.obj_subtype
             
@@ -175,13 +194,12 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
         return "{}:{}:{}".format(room.get_scene().name or "_", room.name or "_", self.name or "_")
         
     def get_unique_name(self, name):
-        room = self.get_room()
-        scene = room.get_scene()
+        room, scene = self.get_room_scene()
         final_name = name
         i = 0
         found_name = False
         while not found_name and final_name != self.name:
-            variant_script_filepath = asset_abspath(room_script_assetpath(scene.name, room.name, final_name))
+            variant_script_filepath = asset_abspath(variant_script_assetpath(scene.name, room.name, final_name))
             if not os.path.exists(variant_script_filepath):
                 found_name = True
             else:  
@@ -201,10 +219,10 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
         scene = room.get_scene()
         self.guid = str(uuid.uuid4())
         name = get_unique_variant_name(scene.name, room.name, name)
-        variant_script_filepath = asset_abspath(room_script_assetpath(scene.name, room.name, name))
+        variant_script_filepath = asset_abspath(variant_script_assetpath(scene.name, room.name, name))
         self.set_name(name)
         if not os.path.exists(variant_script_filepath):
-            create_room_script(scene.name, room.name, name)
+            create_variant_script(scene.name, room.name, name)
         else:
             print("ERROR: Setting variant name to '{}', but there is already a script file at '{}'".format(name, variant_script_filepath))
 
@@ -223,45 +241,105 @@ class Smithy2D_RoomVariant(bpy.types.PropertyGroup):
     def get_name(self):
         return self.get('name', "")
 
+    def get_full_name(self):
+        return "{}/{}".format(self.get_room().get_full_name(), self.name)
+
     def get_room(self):
-        bpy_scene = self.id_data
-        room = bpy_scene.path_resolve(".".join(self.path_from_id().split('.')[0:-1]))
+        room = get_bpy_parent(self)
         return room
 
-    def save_scene_state(self, bpy_scene):
-        self.object_states.clear()
+    # more efficient than calling self.get_room().get_scene() (only calls path_from_id once)
+    def get_room_scene(self):
+        bpy_scene = self.id_data
+        path = self.path_from_id()
 
-        objs = bpy_scene.objects
+        pos_start = path.find('[', 0) + 1
+        pos_end = path.find(']', pos_start)
+        idx = int(path[pos_start:pos_end])
+        scene = bpy_scene.smithy2d.scenes[idx]
+
+        pos_start = path.find('[', pos_start) + 1
+        pos_end = path.find(']', pos_start)
+        idx = int(path[pos_start:pos_end])
+        room = scene.rooms[idx]
+        return room, scene
+
+    def save_scene_state(self, bpy_scene):
+        # find all objects that are not backstage
+        backstage = bpy.data.collections.get("Backstage")
+        if not backstage:
+            objs = bpy_scene.objects
+        else:
+            objs = set()
+            collections = [c for c in bpy.data.collections if c != backstage]
+            collections.append(bpy_scene.collection)
+            for c in collections:
+                for o in c.objects:
+                    objs.add(o)
+
+        # add a state for each valid object
+        self.object_states.clear()
         for o in objs:
-            if not is_backstage(o):
-                state = self.object_states.add()
-                state.name = o.name
-                state.save(o)
+            state = self.object_states.add()
+            state.name = o.name
+            state.save(o)
     
     def get_sorted_object_states(self):
         def hierarchy_depth(state):
             hierarchy_depth = 0
             parent = state
-            while parent.parent:
+            while parent.parent and parent.parent in self.object_states:
+                if parent.parent not in self.object_states:
+                    break #TODO why does this happen sometimes
                 hierarchy_depth += 1
                 assert parent.parent in self.object_states # object parent is backstage??
                 parent = self.object_states[parent.parent]
             return hierarchy_depth
         return sorted(self.object_states, key=hierarchy_depth)
 
+    # load this variant into the bpy scene
     def load_scene_state(self, bpy_scene):
-        prev_objects = bpy.data.objects.keys()
-        for state in self.get_sorted_object_states():
-            obj = get_or_create_object(state.name, state.obj_type)
-            move_onstage(obj)
-            state.load(obj)
-            if obj.name in prev_objects:
-                prev_objects.remove(obj.name)
-        
-        for prev_obj in prev_objects:
-            assert prev_obj in bpy.data.objects
-            move_backstage(bpy.data.objects.get(prev_obj))
+        print("Loading Variant: '{}'".format(self.get_full_name()))
 
+        # get or create the Backstage collection 
+        backstage = bpy.data.collections.get("Backstage")
+        if not backstage:
+            backstage = bpy.data.collections.new("Backstage")
+            backstage.hide_viewport = True
+        if not "Backstage" in bpy.context.scene.collection.children:
+            bpy.context.scene.collection.children.link(backstage)
+        
+        # get or create OnStage
+        onstage = bpy.data.collections.get("OnStage")
+        if not onstage:
+            onstage = bpy.data.collections.new("OnStage")
+
+        # check Backstage for objects we need now
+        for obj_state in self.object_states:
+            if obj_state.name in backstage.objects:
+                o = backstage.objects[obj_state.name]
+                backstage.objects.unlink(o)
+                onstage.objects.link(o)
+
+        # check other collections, add objects backstage if we don't need them
+        collections = [c for c in bpy.data.collections if c != backstage]
+        collections.append(bpy_scene.collection)
+        for c in collections:
+            for o in c.objects:
+                if o.name not in self.object_states:
+                    c.objects.unlink(o)
+                    if o.name not in backstage.objects:
+                        backstage.objects.link(o)
+
+        obj_states = self.get_sorted_object_states()
+        room, scene = self.get_room_scene()
+        for state in self.get_sorted_object_states():
+            obj = bpy.data.objects.get(state.name)
+            if not obj:
+                obj = create_object(state.name, state.obj_type)
+                move_onstage(obj)
+            state.load(self, room, scene, obj)
+        
     guid : bpy.props.StringProperty(default="")
     name : bpy.props.StringProperty()
     object_states : bpy.props.CollectionProperty(type=Smithy2D_ObjectState)
@@ -323,9 +401,11 @@ class Smithy2D_Room(bpy.types.PropertyGroup):
     def get_name(self):
         return self.get('name', "")
 
+    def get_full_name(self):
+        return "{}/{}".format(self.get_scene().name, self.name)
+
     def get_scene(self):
-        bpy_scene = self.id_data
-        scene = bpy_scene.path_resolve(".".join(self.path_from_id().split('.')[0:-1]))
+        scene = get_bpy_parent(self)
         return scene
 
     def contains(self, point):
@@ -505,13 +585,14 @@ class Smithy2D_Scene(bpy.types.PropertyGroup):
     rooms : bpy.props.CollectionProperty(type=Smithy2D_Room)
     active_room_index : bpy.props.IntProperty(default=-1, get=get_room, set=set_room_and_update)
     map_image : bpy.props.StringProperty()
+    dirty : bpy.props.BoolProperty(default=True)
 
 def _scene_changed(old_scene, new_scene):
-        old_room = old_scene.get_active_room() if old_scene else None
-        old_variant = old_room.get_active_variant() if old_room else None
-        new_room = new_scene.get_active_room() if new_scene else None
-        new_variant = new_room.get_active_variant() if new_room else None
-        switch_state((old_scene, old_room, old_variant), (new_scene, new_room, new_variant))
+    old_room = old_scene.get_active_room() if old_scene else None
+    old_variant = old_room.get_active_variant() if old_room else None
+    new_room = new_scene.get_active_room() if new_scene else None
+    new_variant = new_room.get_active_variant() if new_room else None
+    switch_state((old_scene, old_room, old_variant), (new_scene, new_room, new_variant))
 
 class Smithy2D_ScenePropertyGroup(bpy.types.PropertyGroup):
     def get_active_scene(self):

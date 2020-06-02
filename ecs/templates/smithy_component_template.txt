@@ -1,3 +1,5 @@
+-- ${CONTEXT} : ${COMPONENT_NAME}
+
 local ${COMPONENT_NAME} = {}
 
 function ${COMPONENT_NAME}:start(args)

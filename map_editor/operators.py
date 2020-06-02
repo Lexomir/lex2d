@@ -74,7 +74,6 @@ class Smithy2D_DrawNewRoom(bpy.types.Operator):
         return {'RUNNING_MODAL'}
     
     def modal(self, context, event):
-        print("IN THE MODAL")
         return {'FINISHED'}
 
 class Smithy2D_RoomSelector(bpy.types.Operator):
