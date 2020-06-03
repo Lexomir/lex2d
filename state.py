@@ -1,7 +1,6 @@
 import bpy
 from .utils import *
 from . import ecs
-from .ObjUtils import BoundingBox, set_mesh_preserve_origin
 from .properties import SMITHY2D_INVALID_ID
 from bpy.app.handlers import persistent
 import addon_utils

@@ -7,6 +7,7 @@ import subprocess
 import traceback
 import mathutils
 from mathutils import Vector, Matrix, Quaternion
+from .ObjUtils import set_mesh_preserve_origin
 from .utils import *
 from . import ObjUtils
 from .ecs import component_system 
@@ -74,7 +75,7 @@ class SetTextureFromFileBrowser(bpy.types.Operator):
 
             # create the sprite rectangle
             bm = create_rectangle_bmesh(screen_to_bl_size(tile_size))
-            bm.to_mesh(active_obj.data)
+            set_mesh_preserve_origin(active_obj, bm)
             bm.free()
 
             # have to set the location after we set it's mesh for some reason
@@ -177,7 +178,7 @@ class Smithy2D_SetOriginToObjectTopLeft(bpy.types.Operator):
     bl_label = "Smithy2D Set Origin to obj top left"
 
     def execute(self, context):
-        bounds = ObjUtils.BoundingBox(context.object)
+        bounds = ObjUtils.BoundingBox(from_obj=context.object)
         scaled_bbl = [v * ov for v, ov in zip(bounds.get_bottombackleft(), context.object.scale)]
         ObjUtils.set_origin(context.object, context.object.location + mathutils.Vector(scaled_bbl))
         return {'FINISHED'}

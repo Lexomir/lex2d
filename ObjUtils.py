@@ -4,7 +4,7 @@ import mathutils
 from .utils import *
 
 def get_bounds(obj):
-    return BoundingBox(obj)
+    return BoundingBox(from_obj=obj)
 
 def shift_verts(obj, move_amt):
     me = obj.data
@@ -54,6 +54,16 @@ class BoundingBoxBase:
             max_vec[i] = max(values)
             self.box_min[i] = min(values)
             self.box_max[i] = max(values)
+
+    def set_from_bmesh(self, bm):
+        coords = [vert.co[:] for vert in bm.verts]
+        axis_values = zip(*coords)
+        min_vec, max_vec = {}, {}
+        for i, values in enumerate(axis_values):
+            min_vec[i] = min(values)
+            max_vec[i] = max(values)
+            self.box_min[i] = min(values)
+            self.box_max[i] = max(values)
     
     def get_bottomfrontleft(self): return mathutils.Vector(self.box_min)
     def get_bottombackleft(self): return mathutils.Vector([self.box_min[0], self.box_max[1], self.box_min[2]])
@@ -67,10 +77,13 @@ class BoundingBoxBase:
         return self.topleft
 
 class BoundingBox(BoundingBoxBase):
-    def __init__(self, obj):
+    def __init__(self, from_obj=None, from_bm=None):
         self.box_min = mathutils.Vector([0, 0, 0])
         self.box_max = mathutils.Vector([0, 0, 0])
-        self.set_from_object(obj) 
+        if from_obj:
+            self.set_from_object(from_obj) 
+        elif from_bm:
+            self.set_from_bmesh(from_bm) 
 
 
 class BpyBoundingBox(bpy.types.PropertyGroup, BoundingBoxBase):
@@ -82,15 +95,14 @@ class BpyBoundingBox(bpy.types.PropertyGroup, BoundingBoxBase):
     box_max : bpy.props.FloatVectorProperty(size=3, default=[0, 0, 0])
 
 def set_mesh_preserve_origin(obj, bm):
-    original_bb = BoundingBox(obj)
+    original_bb = BoundingBox(from_obj=obj)
     obj_size = original_bb.get_dimensions()
     if obj_size[0] == 0 or obj_size[1] == 0:
         tl = mathutils.Vector([0,0,0])
     else:
         tl = original_bb.get_bottombackleft()
         tl = mathutils.Vector([tl[0] / obj_size[0], tl[1] / obj_size[1], 0])
-    apply_bmesh_to_object(obj, bm)
-    new_bb = BoundingBox(obj)
+    new_bb = BoundingBox(from_bm=bm)
     new_size = new_bb.get_dimensions()
     if new_size[0] == 0 or new_size[1] == 0:
         new_tl = mathutils.Vector([0,0,0])
@@ -98,4 +110,6 @@ def set_mesh_preserve_origin(obj, bm):
         new_tl = new_bb.get_bottombackleft()
         new_tl = mathutils.Vector([new_tl[0] / new_size[0], new_tl[1] / new_size[1], 0])
     vert_move_amt = multiply_vec3((tl - new_tl), new_size)
-    shift_verts(obj, vert_move_amt)
+    for v in bm.verts:
+        v.co += vert_move_amt
+    bm.to_mesh(obj.data)
